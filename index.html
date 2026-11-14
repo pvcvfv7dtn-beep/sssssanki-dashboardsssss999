@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Anki EDN">
+<meta name="theme-color" content="#f3f2ee">
+<title>Anki Tracker – EDN</title>
+<style>
+  :root {
+    --bg: #f3f2ee; --card: #ffffff; --text: #1d1d1f; --muted: #86868b;
+    --line: #e7e5e0; --accent: #2f6fde; --new: #3aa76d; --rev: #e08a2c;
+    --track: #ecebe7; --danger: #d64545; --sun: #f5a623; --break: #3aa76d;
+    --sky1: #fff6e5; --sky2: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #161618; --card: #252527; --text: #f2f2f7; --muted: #98989d;
+      --line: #38383a; --accent: #5e9bff; --new: #4cc38a; --rev: #f2a043;
+      --track: #38383a; --danger: #ff6b6b; --sun: #ffb84d; --break: #4cc38a;
+      --sky1: #2e2a22; --sky2: #252527; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #161618; --card: #252527; --text: #f2f2f7; --muted: #98989d;
+      --line: #38383a; --accent: #5e9bff; --new: #4cc38a; --rev: #f2a043;
+      --track: #38383a; --danger: #ff6b6b; --sun: #ffb84d; --break: #4cc38a;
+      --sky1: #2e2a22; --sky2: #252527; color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); font-size: 14px;
+    display: flex; align-items: center; justify-content: center; padding: 2vh 2vw;
+    overflow: hidden;
+  }
+  /* Cadre 16:9 qui remplit l'écran */
+  .app {
+    width: min(96vw, calc(96vh * 16 / 9));
+    aspect-ratio: 16 / 9;
+    height: min(96vh, calc(96vw * 9 / 16));
+    display: grid;
+    grid-template-columns: 0.72fr 0.88fr 0.88fr 0.82fr;
+    grid-template-rows: calc((100% - 28px) * 0.29) fit-content(calc((100% - 28px) * 0.40)) minmax(0, 1fr);
+    align-content: start;
+    grid-template-areas:
+      "pomo anki anki day"
+      "rest rest rest rest"
+      "imp  imp  imp  imp";
+    gap: 14px;
+  }
+  /* Items + À ajouter : côte à côte, même hauteur, juste la place nécessaire (défilent si trop longs) */
+  .bottom-right { grid-area: rest; display: flex; gap: 14px; align-self: start; max-height: 100%; min-height: 0; min-width: 0; }
+  .bottom-right > .card { flex: 1 1 0; min-width: 0; min-height: 0; }
+  .a-pomo { grid-area: pomo; } .a-anki { grid-area: anki; } .a-day { grid-area: day; }
+  .a-items { grid-area: items; } .a-lists { grid-area: lists; } .a-imp { grid-area: imp; align-self: start; justify-self: start; width: min(100%, 340px); }
+  .app.imp-off .a-imp { align-self: end; }
+  @media (min-width: 901px) and (min-aspect-ratio: 4/3) { .app.imp-off { grid-template-rows: calc((100% - 28px) * 0.29) fit-content(calc((100% - 28px) * 0.70)) minmax(0, 1fr); } }
+  /* Les deux cases du bas s'alignent sur la plus remplie, plafonnées à l'espace dispo */
+
+  /* Version mobile / fenêtre étroite : tout s'empile */
+  @media (max-width: 900px), (max-aspect-ratio: 4/3) {
+    body { display: block; overflow: auto; padding: 12px; height: auto; }
+    .app {
+      width: 100%; aspect-ratio: auto; height: auto;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 210px auto auto auto auto;
+      grid-template-areas: "pomo day" "anki anki" "items items" "lists lists" "imp imp";
+    }
+    .bottom-right { display: contents; }
+    .a-imp { align-self: start; max-height: none !important; width: 100%; max-width: 480px; justify-self: center; }
+    .app .ring { max-height: 176px; }
+  }
+  @media (max-width: 480px) {
+    .app { grid-template-rows: 200px auto auto auto auto; gap: 10px; }
+    .card { padding: 14px; }
+  }
+
+  /* ---------- Heures de journée cliquables ---------- */
+  .hrlbl { cursor: pointer; }
+  .hrlbl text { font-size: 15px; fill: var(--muted); }
+  .hrlbl:hover text { fill: var(--text); text-decoration: underline dotted; }
+  .hrinput { position: fixed; z-index: 30; width: 62px; font: inherit; font-size: 13px; text-align: center; padding: 3px 4px;
+    border: 1px solid var(--accent); border-radius: 6px; background: var(--card); color: var(--text); outline: none; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+
+  /* ---------- Feuille « Important » : jaune grainé + boxes arrondies ---------- */
+  [hidden] { display: none !important; }
+  .paper {
+    --ink: #0c1e26; --ink2: rgba(12,30,38,.58); --red: #b1301f; --box: rgba(255,255,255,.80); --khaki: #9d9059;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    position: relative; isolation: isolate; max-height: 100%; overflow-y: auto; scrollbar-width: none;
+    color: var(--ink); font-family: var(--sans); padding: 14px 14px 16px; border-radius: 16px;
+    display: flex; flex-direction: column; gap: 14px;
+    background:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='g' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 .12'/></filter><rect width='200' height='200' filter='url(%23g)'/></svg>"),
+      #dccf96;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .paper::-webkit-scrollbar { display: none; }
+  :root[data-theme="dark"] .paper { --ink:#ece8da; --ink2:rgba(236,232,218,.6); --box:rgba(255,255,255,.075); --khaki:#7d7347; filter:none;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='g' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 .09'/></filter><rect width='200' height='200' filter='url(%23g)'/></svg>"), #36342d; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  :root[data-theme="dark"] .paper .pbox, :root[data-theme="dark"] .paper .pbtn { box-shadow: 0 1px 1px rgba(0,0,0,.25), 0 3px 9px rgba(0,0,0,.25); }
+  :root[data-theme="dark"] .paper .pbtn:hover { background: rgba(255,255,255,.14); }
+  :root[data-theme="dark"] .paper .eye:hover, :root[data-theme="dark"] .paper .fam-add:hover { background: rgba(255,255,255,.1); }
+  :root[data-theme="dark"] .paper .person.ok .pbtn { color: #f6f0d6; }
+  :root[data-theme="dark"] .paper .fam.urgent { background: rgba(255,255,255,.05); color: #ff9d8e; box-shadow: 0 0 0 1.4px rgba(255,110,95,.6), 0 4px 12px rgba(0,0,0,.3); }
+  :root[data-theme="dark"] .paper .fam.urgent::before { mix-blend-mode: screen; opacity: .55; }
+  :root[data-theme="dark"] .paper .pfield input[type=text], :root[data-theme="dark"] .paper .ptodo-add input[type=text], :root[data-theme="dark"] .paper .pplus, :root[data-theme="dark"] .paper .fam input[type=date], :root[data-theme="dark"] .paper .editlog input[type=datetime-local] { background: rgba(255,255,255,.08) !important; color: var(--ink); }
+  :root[data-theme="dark"] .paper .pcheck { background: rgba(255,255,255,.16); } :root[data-theme="dark"] .paper .pcheck:hover { background: rgba(255,255,255,.26); }
+  :root[data-theme="dark"] .paper .pcheck:checked { background: rgba(160,175,110,.75); }
+  :root[data-theme="dark"] .paper .ptodo li { border-bottom-color: rgba(255,255,255,.08); }
+  :root[data-theme="dark"] .paper .lbl { color: var(--ink2); }
+  :root[data-theme="dark"] .paper .xbtn:hover { color: #ff9d8e; background: rgba(255,120,100,.14); }
+  @media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .paper { --ink:#ece8da; --ink2:rgba(236,232,218,.6); --box:rgba(255,255,255,.075); --khaki:#7d7347; filter:none;
+      background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='g' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 .09'/></filter><rect width='200' height='200' filter='url(%23g)'/></svg>"), #36342d; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    :root:not([data-theme="light"]) .paper .pbox, :root:not([data-theme="light"]) .paper .pbtn { box-shadow: 0 1px 1px rgba(0,0,0,.25), 0 3px 9px rgba(0,0,0,.25); }
+    :root:not([data-theme="light"]) .paper .pbtn:hover { background: rgba(255,255,255,.14); }
+    :root:not([data-theme="light"]) .paper .eye:hover, :root:not([data-theme="light"]) .paper .fam-add:hover { background: rgba(255,255,255,.1); }
+    :root:not([data-theme="light"]) .paper .person.ok .pbtn { color: #f6f0d6; }
+    :root:not([data-theme="light"]) .paper .fam.urgent { background: rgba(255,255,255,.05); color: #ff9d8e; box-shadow: 0 0 0 1.4px rgba(255,110,95,.6), 0 4px 12px rgba(0,0,0,.3); }
+    :root:not([data-theme="light"]) .paper .fam.urgent::before { mix-blend-mode: screen; opacity: .55; }
+    :root:not([data-theme="light"]) .paper .pfield input[type=text], :root:not([data-theme="light"]) .paper .ptodo-add input[type=text], :root:not([data-theme="light"]) .paper .pplus, :root:not([data-theme="light"]) .paper .fam input[type=date], :root:not([data-theme="light"]) .paper .editlog input[type=datetime-local] { background: rgba(255,255,255,.08) !important; color: var(--ink); }
+    :root:not([data-theme="light"]) .paper .pcheck { background: rgba(255,255,255,.16); } :root:not([data-theme="light"]) .paper .pcheck:hover { background: rgba(255,255,255,.26); }
+    :root:not([data-theme="light"]) .paper .pcheck:checked { background: rgba(160,175,110,.75); }
+    :root:not([data-theme="light"]) .paper .ptodo li { border-bottom-color: rgba(255,255,255,.08); }
+    :root:not([data-theme="light"]) .paper .lbl { color: var(--ink2); }
+    :root:not([data-theme="light"]) .paper .xbtn:hover { color: #ff9d8e; background: rgba(255,120,100,.14); }
+}
+  .themebtn { position: fixed; right: 12px; bottom: 10px; z-index: 20; width: 30px; height: 30px; border-radius: 50%; border: 0; cursor: pointer; font-size: 15px; line-height: 30px; background: var(--card); color: var(--text); box-shadow: 0 1px 6px rgba(0,0,0,.18); opacity: .55; transition: opacity .15s, transform .12s; }
+  .themebtn:hover { opacity: 1; } .themebtn:active { transform: scale(.92); }
+  .paper input, .paper button { font-family: inherit; color: inherit; }
+  .phead { display: flex; align-items: center; justify-content: space-between; }
+  .ptitle { font: 650 17px/1 var(--sans); letter-spacing: -.01em; }
+  .eye { border: 0; background: transparent; font-size: 17px; line-height: 1; cursor: pointer; padding: 4px 6px; border-radius: 8px; transition: background .15s, opacity .15s; }
+  .eye:hover { background: rgba(255,255,255,.55); }
+  .paper.collapsed { padding: 10px 12px; width: fit-content; min-width: 150px; }
+  .paper.collapsed .pbody { display: none; }
+  .paper.collapsed .eye { opacity: .5; }
+  .pbody { display: flex; flex-direction: column; gap: 14px; }
+  .lbl { font: 600 10.5px/1 var(--sans); text-transform: uppercase; letter-spacing: .09em; color: var(--ink2); margin-bottom: 8px; }
+  .pbox { background: var(--box); border-radius: 14px; padding: 11px 13px; box-shadow: 0 1px 1px rgba(60,50,10,.06), 0 4px 12px rgba(60,50,10,.09); }
+  .xbtn { border: 0; background: none; color: var(--ink2); cursor: pointer; font-size: 11px; padding: 2px 5px; border-radius: 4px; line-height: 1; }
+  .xbtn:hover { color: var(--red); background: rgba(155,42,26,.1); }
+
+  /* Famileo */
+  .fam { position: relative; }
+  .fam > * { position: relative; z-index: 1; }
+  .fam .lbl { margin-bottom: 6px; }
+  .fam-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .fam-date { font: 600 16px var(--sans); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; border-bottom: 1px dashed transparent; }
+  .fam-date:hover { border-bottom-color: var(--ink2); }
+  .famwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: stretch; }
+  .famwrap .fam { min-width: 0; padding: 9px 11px; }
+  .famwrap .fam-date { font-size: 13.5px; white-space: nowrap; }
+  .famwrap .fam-count { font-size: 17px; }
+  .fam-add { font-size: 11px; line-height: 1.2; }
+  .fam .fam-rm { position: absolute; top: 6px; right: 8px; opacity: 0; transition: opacity .15s; z-index: 2; }
+  .fam:hover .fam-rm, .fam:focus-within .fam-rm { opacity: 1; }
+  .fam-add { border: 1.4px dashed rgba(60,50,10,.3); background: none; border-radius: 12px; padding: 6px; font: 500 12px var(--sans); color: var(--ink2); cursor: pointer; }
+  .fam-add:hover { background: rgba(255,255,255,.5); }
+  .fam-count { font: 700 21px var(--sans); letter-spacing: -.01em; white-space: nowrap; }
+  .fam input[type=date] { font: 14px var(--sans); border: 0; border-radius: 8px; background: rgba(0,0,0,.05); padding: 4px 7px; min-width: 0; flex: 1; outline: none; }
+  .fam.urgent { background: rgba(255,255,255,.4); color: #8c1a10; box-shadow: 0 0 0 1.4px rgba(190,35,30,.55), 0 4px 12px rgba(150,30,20,.12); }
+  .fam.urgent::before {
+    content: ""; position: absolute; inset: -3px -4px; z-index: 0; pointer-events: none;
+    border-radius: 16px 18px 15px 19px / 18px 15px 19px 16px; transform: rotate(-.4deg); mix-blend-mode: multiply;
+    background: linear-gradient(98deg, rgba(255,64,48,0) 0, rgba(255,64,48,.42) 2.5%, rgba(255,64,48,.30) 45%, rgba(255,64,48,.40) 97%, rgba(255,64,48,0) 100%);
+  }
+
+  /* Appels */
+  .callh { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  .callh:hover .pen, .callh:focus-visible .pen { opacity: 1; }
+  .pen { opacity: .5; font-size: 11px; transition: opacity .15s; letter-spacing: 0; }
+  .people { display: flex; flex-wrap: wrap; gap: 5px; }
+  .person { position: relative; min-width: 50px; flex: 1 1 0; touch-action: pan-y; }
+  .person.dragging { z-index: 5; pointer-events: auto; cursor: grabbing; filter: drop-shadow(0 8px 14px rgba(60,50,10,.3)); transition: none; }
+  .person.dragging .pbtn { cursor: grabbing; }
+  .person.drop .pbtn { outline: 2px dashed rgba(12,30,38,.4); outline-offset: 2px; }
+  .pbtn {
+    all: unset; box-sizing: border-box; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 4px 3px 3px;
+    border-radius: 10px; background: var(--box); cursor: pointer;
+    box-shadow: 0 1px 1px rgba(60,50,10,.06), 0 3px 9px rgba(60,50,10,.08);
+    transition: transform .12s ease, background .15s ease;
+  }
+  .pbtn:hover { background: rgba(255,255,255,.95); }
+  .pbtn:active { transform: scale(.97); }
+  .pbtn:focus-visible { outline: 2px solid var(--ink2); outline-offset: 2px; }
+  .nm { font: 500 12px/1.25 var(--sans); max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .jx { font: 600 9.5px/1.2 var(--sans); color: var(--ink2); font-variant-numeric: tabular-nums; }
+  .jx.late { color: var(--red); }
+  .person.ok .pbtn { background: var(--khaki); color: #fbf7e4; box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 1px 1px rgba(60,50,10,.12); }
+  .person.ok .jx { color: rgba(251,247,228,.85); }
+  .prm { display: none; position: absolute; top: -6px; right: -6px; z-index: 2; width: 18px; height: 18px; padding: 0; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); font-size: 9px; line-height: 18px; text-align: center; }
+  .prm:hover { background: #fff; }
+  .call.editing .prm { display: block; }
+  .calllog { list-style: none; margin-top: 9px; font-size: 11.5px; color: var(--ink2); }
+  .calllog li { display: flex; justify-content: space-between; gap: 8px; padding: 1px 3px; }
+  .call-edit { display: none; margin-top: 10px; }
+  .call.editing .call-edit { display: block; }
+  .call.editing .calllog { display: none; }
+  .call-edit .pbox { padding: 9px 10px; }
+  .pfield { display: flex; gap: 6px; }
+  .paper .pfield input[type=text] { flex: 1; min-width: 0; border: 0; border-radius: 8px; background: rgba(0,0,0,.05); padding: 6px 9px; font: 500 13px var(--sans); outline: none; }
+  .pplus { border: 0; background: rgba(0,0,0,.07); border-radius: 8px; width: 30px; cursor: pointer; font-size: 15px; line-height: 1; }
+  .pplus:hover { background: rgba(0,0,0,.12); }
+  .editlog { list-style: none; margin-top: 8px; max-height: 170px; overflow-y: auto; scrollbar-width: thin; }
+  .editlog li { display: flex; align-items: center; gap: 5px; padding: 3px 0; }
+  .editlog .who { flex: none; width: 56px; font: 500 13px var(--sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .editlog .none { font-size: 12px; color: var(--ink2); }
+  .editlog input[type=datetime-local] { flex: 1; min-width: 0; font: 11px var(--sans); padding: 3px 4px; border: 0; border-radius: 6px; background: rgba(0,0,0,.05); color: var(--ink); }
+
+  /* À faire */
+  .ptodo { list-style: none; }
+  .ptodo li { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,.06); }
+  .ptodo li:last-child { border-bottom: 0; }
+  .ptodo li { position: relative; }
+  .ptodo .grip { flex: none; width: 10px; margin: 1px -4px 0 -4px; color: var(--ink2); opacity: 0; font-size: 13px; line-height: 18px; cursor: grab; touch-action: none; user-select: none; text-align: center; }
+  .ptodo li:hover .grip { opacity: .7; }
+  @media (hover: none) { .ptodo .grip { opacity: .5; } }
+  .ptodo li.dragging { z-index: 6; cursor: grabbing; background: var(--box, rgba(255,255,255,.9)); border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.28); transition: none; }
+  .ptodo li.drop-before::before, .ptodo li.drop-after::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; border-radius: 2px; background: var(--accent, #2f6fde); }
+  .ptodo li.drop-before::before { top: -1px; } .ptodo li.drop-after::after { bottom: -1px; }
+  .pcheck { appearance: none; -webkit-appearance: none; flex: none; width: 18px; height: 18px; margin: 1px 0 0; border: 0; border-radius: 6px;
+    background: rgba(90,100,60,.26); cursor: pointer; position: relative; transition: background .15s; }
+  .pcheck:hover { background: rgba(90,100,60,.36); }
+  .pcheck:checked { background: rgba(70,80,45,.72); }
+  .pcheck:checked::after { content: ""; position: absolute; left: 6.5px; top: 2.5px; width: 4.5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(40deg); }
+  .ptodo .txt { flex: 1; min-width: 0; font: 500 14px/1.35 var(--sans); word-break: break-word; }
+  .ptodo li.ok .txt { text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: .45; }
+  .ptodo .xbtn { opacity: 0; margin-top: 1px; }
+  .paper .ptodo li input.tedit { flex: 1; min-width: 0; border: 0; border-radius: 6px; background: rgba(0,0,0,.07); font: 500 14px/1.35 var(--sans); padding: 1px 6px; outline: 2px solid var(--accent, #2f6fde); color: inherit; }
+  .ptodo li:hover .xbtn { opacity: 1; }
+  @media (hover: none) { .ptodo .xbtn { opacity: .5; } }
+  .paper .ptodo-add input[type=text] { width: 100%; border: 0; border-radius: 8px; background: rgba(0,0,0,.045); font: 500 13.5px var(--sans); padding: 7px 10px; outline: none; margin-top: 6px; }
+  .paper .ptodo-add input[type=text]::placeholder { color: var(--ink2); }
+  .ptodo-clear { margin-top: 8px; background: none; border: 0; font-size: 11px; color: var(--ink2); cursor: pointer; text-decoration: underline dotted; padding: 0; }
+  .ptodo-clear:hover { color: var(--ink); }
+  .card {
+    background: var(--card); border-radius: 16px; padding: 18px 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  }
+  .card h2 {
+    font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .card h2 .count { background: var(--track); color: var(--text); border-radius: 10px; padding: 1px 8px; font-size: 11px; letter-spacing: 0; }
+
+  /* ---------- Pomodoro ---------- */
+  .pomo { align-items: center; position: relative; padding: 10px 12px; }
+  .pomo h2 { position: absolute; top: 12px; left: 14px; font-size: 10px; margin: 0; z-index: 1; }
+  .worktot { position: absolute; top: 11px; right: 14px; z-index: 1; font: 200 13px/1 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; letter-spacing: .01em; color: var(--text); opacity: .75; font-variant-numeric: tabular-nums; }
+  .ring .clock.over { color: #d9822b; }
+  .tomato {
+    position: absolute; right: 14px; bottom: 12px; border: 0; background: transparent; cursor: pointer;
+    font: inherit; font-size: 12px; color: var(--text); padding: 3px 7px; border-radius: 10px;
+    display: flex; align-items: center; gap: 4px; transition: background .15s, transform .12s;
+  }
+  .tomato:hover { background: var(--track); }
+  .tomato:active { transform: scale(.94); }
+  .pomo h2 { align-self: stretch; }
+  .pomo-body { flex: 1; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 16px; width: 100%; min-height: 0; }
+  .ring { position: relative; height: 100%; min-height: 0; max-height: 204px; aspect-ratio: 1; flex: none; }
+  .ring svg { width: 100%; height: 100%; overflow: visible; }
+  #avo { transition: transform .5s linear; }
+  .ring path.bg, .ring path.fg { fill: none; stroke-width: 8; stroke-linecap: round; }
+  .ring .bg { stroke: var(--track); }
+  .ring .fg { filter: drop-shadow(0 0 3px rgba(47,111,222,.35)); }
+  .ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .5s linear, stroke .3s; }
+  .ring.break .fg { opacity: .6; }
+  .ring .center { position: absolute; inset: 0 0 6% 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring .clock { font-size: clamp(19px, 1.9vw, 29px); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .ring .mode { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .pomo-ctrl { position: absolute; left: 50%; top: 79%; transform: translateX(-50%); display: flex; flex-direction: row; align-items: center; gap: 5px; }
+  .icons { display: flex; gap: 6px; }
+  .ic {
+    width: 21px; height: 21px; border-radius: 50%; border: 0;
+    background: rgba(120,120,128,.14); color: var(--text); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .12s ease, background .15s ease;
+  }
+  .ic svg { width: 9px; height: 9px; fill: currentColor; }
+  .ic:hover { background: rgba(120,120,128,.22); }
+  .ic:active { transform: scale(.92); }
+  .ic.main { width: 26px; height: 26px; background: var(--accent); color: #fff; box-shadow: 0 1px 5px rgba(47,111,222,.28); }
+  .ic.main svg { width: 10px; height: 10px; }
+  .ic.main:hover { filter: brightness(1.08); background: var(--accent); }
+  .cycles { font-size: 12px; color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 500; }
+  .cycles b { color: var(--text); }
+
+  /* ---------- Soleil ---------- */
+  .day { padding: 14px 16px; background: linear-gradient(180deg, var(--sky1), var(--sky2)); position: relative; overflow: hidden; }
+  .day-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .time { font-size: clamp(20px, 1.9vw, 28px); font-weight: 650; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+  .fulldate { color: var(--muted); font-size: 11.5px; margin-top: 3px; text-transform: capitalize; }
+  .daypct { margin-top: 3px; }
+  .daypct .big { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .daypct .small { font-size: 11px; color: var(--muted); }
+  .view { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .view.active { display: flex; }
+  .vtoggle { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; gap: 2px; padding: 2px;
+    background: rgba(120,120,128,.14); border-radius: 8px; }
+  .vtoggle button { width: 24px; height: 20px; border: 0; border-radius: 6px; background: transparent;
+    color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .vtoggle button svg { width: 11px; height: 11px; fill: currentColor; }
+  .vtoggle button.active { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+  .links-title { font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 3px 0 12px; }
+  .links { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; align-content: start; overflow-y: auto; min-height: 0; padding: 2px; }
+  .tile { position: relative; aspect-ratio: 1; max-width: 62px; width: 100%; justify-self: center;
+    border-radius: 15px; background: rgba(120,120,128,.13); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border: 0; text-decoration: none; transition: transform .12s ease, background .15s; }
+  .tile:hover { background: rgba(120,120,128,.22); }
+  .tile:active { transform: scale(.93); }
+  .tile img { position: absolute; width: 46%; height: 46%; object-fit: contain; border-radius: 6px; opacity: 0; }
+  .tile.has-icon img { opacity: 1; }
+  .tile.has-icon .letter { opacity: 0; }
+  .tile .letter { font-weight: 700; font-size: 18px; color: var(--accent); }
+  .tile.add { background: transparent; border: 1.5px dashed var(--line); color: var(--muted); font-size: 20px; font-weight: 300; }
+  .tile .x { position: absolute; top: -5px; right: -5px; width: 16px; height: 16px; border-radius: 50%; border: 0;
+    background: var(--muted); color: var(--card); font-size: 9px; line-height: 16px; cursor: pointer; opacity: 0; transition: opacity .15s; }
+  .tile:hover .x { opacity: 1; }
+  .linkform { display: none; gap: 5px; margin-top: 10px; }
+  .linkform.open { display: flex; }
+  .linkform input { padding: 6px 8px; font-size: 12px; }
+  .linkform #linkName { flex: 0 0 28%; }
+  .linkform .btn { padding: 6px 10px; font-size: 12px; }
+  .arc { flex: 1; min-height: 0; margin-top: 6px; }
+  .arc svg { width: 100%; height: 100%; overflow: visible; }
+
+  /* ---------- Progression Anki ---------- */
+  .row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+  .label { font-weight: 600; font-size: 14px; }
+  .value { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+  .value b { color: var(--text); font-weight: 600; font-size: 15px; }
+  .bar { height: 12px; background: var(--track); border-radius: 7px; overflow: hidden; display: flex; }
+  .bar > div { height: 100%; transition: width .4s ease; }
+  .fill-time { background: var(--accent); }
+  .fill-new { background: var(--new); }
+  .fill-rev { background: var(--rev); }
+  .block + .block { margin-top: 18px; }
+  .legend { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .legend b { color: var(--text); font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+  .status { font-size: 11.5px; color: var(--muted); margin-top: auto; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .status.err { color: var(--danger); }
+  .done { color: var(--new); font-weight: 600; }
+
+  /* ---------- Listes ---------- */
+  form.add { display: flex; gap: 6px; margin-bottom: 8px; }
+  input[type=text], input[type=number], input[type=url], input[type=password] {
+    flex: 1; min-width: 0; font: inherit; padding: 8px 10px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  button.btn {
+    font: inherit; font-weight: 600; border: 0; border-radius: 9px; padding: 8px 13px;
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+  button.btn.sec { background: var(--track); color: var(--text); }
+  button.ghost { background: transparent; color: var(--muted); border: 0; font: inherit; font-size: 12px; cursor: pointer; padding: 2px 4px; }
+  button.ghost:hover { color: var(--text); }
+  .scroll { flex: 0 1 auto; overflow-y: auto; min-height: 0; margin-right: -8px; padding-right: 8px; }
+  ul.list { list-style: none; }
+  ul.list li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+  ul.list li:last-child { border-bottom: 0; }
+  /* Une seule ligne par défaut ; texte complet au survol (souris) ou au toucher (mobile) */
+  ul.list li span.txt { flex: 1; min-width: 0; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+  ul.list li.open span.txt { white-space: normal; overflow: visible; word-break: break-word; }
+  @media (hover: hover) { ul.list li:hover span.txt { white-space: normal; overflow: visible; word-break: break-word; } }
+  ul.list li.checked span.txt { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--muted); opacity: .6; }
+  ul.list li.checked input[type=checkbox] { opacity: .6; }
+
+  /* Complétion des items */
+  .ac { position: relative; flex: 1; min-width: 0; }
+  .ac .field { position: relative; border: 1px solid var(--line); background: var(--bg); border-radius: 9px; }
+  .ac .field:focus-within { border-color: var(--accent); }
+  .ac .field input { position: relative; width: 100%; border: 0; background: transparent; padding: 8px 10px; border-radius: 9px; }
+  .ac .ghosttxt { position: absolute; inset: 0; padding: 8px 10px; font: inherit; white-space: pre; overflow: hidden; pointer-events: none; color: var(--muted); opacity: .75; }
+  .ac .ghosttxt .typed { visibility: hidden; }
+  .ac-list { display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20; list-style: none;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.14); }
+  .ac-list.open { display: block; }
+  .ac-list li { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+  .ac-list li .n { flex: none; min-width: 28px; font-weight: 650; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .ac-list li .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ac-list li.sel { background: rgba(120,120,128,.14); }
+  .ac-list li .kbd { flex: none; font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  .ac-list li:not(.sel) .kbd { display: none; }
+  ul.list input[type=checkbox] { width: 16px; height: 16px; margin-top: 1px; accent-color: var(--accent); cursor: pointer; flex: none; }
+  .del { opacity: 0; transition: opacity .15s; }
+  li:hover .del { opacity: 1; }
+  .empty { color: var(--muted); font-size: 13px; padding: 6px 2px; }
+  .sub { font-size: 11px; color: var(--muted); margin: 14px 0 2px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .seg { display: flex; gap: 3px; background: var(--track); border-radius: 9px; padding: 3px; margin-bottom: 10px; }
+  .seg button {
+    flex: 1; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px;
+    font-weight: 600; padding: 6px 8px; border-radius: 7px; cursor: pointer;
+  }
+  .seg button.active { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .seg .n { font-weight: 500; color: var(--muted); margin-left: 4px; }
+  .foot { display: flex; justify-content: flex-end; padding-top: 6px; }
+
+  /* ---------- Réglages (fenêtre) ---------- */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.3); display: none; align-items: center; justify-content: center; z-index: 10; }
+  .modal.open { display: flex; }
+  .modal .card { width: 380px; max-width: calc(100vw - 24px); max-height: calc(100vh - 40px); overflow: auto; }
+  .modal input[type=text], .modal input[type=url], .modal input[type=password] { flex: 1 1 auto; min-width: 0; max-width: 210px; }
+  .syncrow { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 4px 0 8px; }
+  .syncstate { font-size: 12px; color: var(--muted); }
+  .syncstate.ok { color: var(--new); } .syncstate.err { color: var(--danger); }
+  .synchelp { font-size: 11.5px; color: var(--muted); margin: 0 0 8px; line-height: 1.4; }
+  .modal label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; gap: 12px; }
+  .modal input[type=number] { flex: 0 0 80px; text-align: right; }
+  .modal .sub:first-of-type { margin-top: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+
+    <!-- POMODORO -->
+  <section class="card pomo a-pomo">
+    <h2>Pomodoro</h2>
+    <span class="worktot" id="workTot" title="Temps de travail aujourd'hui (dépassements inclus)"></span>
+    <button class="tomato" data-open="settings" title="Réglages"><b id="pomoCount">0</b> 🍅</button>
+    <div class="pomo-body">
+      <div class="ring" id="ring">
+        <svg viewBox="-8 -8 116 116">
+          <path class="bg" d="M 18.887 81.113 A 44 44 0 1 1 81.113 81.113"/>
+          <path class="fg" id="ringFg" d="M 18.887 81.113 A 44 44 0 1 1 81.113 81.113"
+                stroke-dasharray="207.35" stroke-dashoffset="207.35"/>
+          <g id="avo" transform="translate(18.887,81.113)"><circle r="6.5" fill="var(--accent)" stroke="var(--card)" stroke-width="2.5"/></g>
+        </svg>
+        <div class="center">
+          <div class="clock" id="pomoClock">25:00</div>
+          <div class="mode" id="pomoMode">Travail</div>
+        </div>
+        <div class="pomo-ctrl">
+          <button class="ic" id="pomoReset" title="Réinitialiser"><svg viewBox="0 0 16 16"><path d="M8 2.2a5.8 5.8 0 1 1-5.6 7.3.9.9 0 0 1 1.7-.5A4 4 0 1 0 5.2 5.1H6.6a.9.9 0 0 1 0 1.8H3a.9.9 0 0 1-.9-.9V2.4a.9.9 0 0 1 1.8 0v1.2A5.8 5.8 0 0 1 8 2.2z"/></svg></button>
+          <button class="ic main" id="pomoStart" title="Démarrer"><svg viewBox="0 0 16 16"><path d="M4.5 2.6c0-.8.9-1.3 1.6-.9l7.3 4.6c.6.4.6 1.3 0 1.7l-7.3 4.6c-.7.4-1.6-.1-1.6-.9z"/></svg></button>
+          <button class="ic" id="pomoSkip" title="Passer"><svg viewBox="0 0 16 16"><path d="M2 3.6c0-.7.8-1.1 1.4-.7l6 4.4c.5.4.5 1.1 0 1.4l-6 4.4c-.6.4-1.4 0-1.4-.7z"/><rect x="11" y="2.8" width="2.6" height="10.4" rx="1"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROGRESSION ANKI -->
+  <section class="card a-anki">
+    <h2>Anki aujourd'hui <button class="ghost" data-open="settings">Objectifs</button></h2>
+    <div class="block">
+      <div class="row"><span class="label">Temps de révision</span><span class="value" id="timeVal">–</span></div>
+      <div class="bar"><div class="fill-time" id="timeBar" style="width:0%"></div></div>
+    </div>
+    <div class="block">
+      <div class="row"><span class="label">Cartes</span><span class="value" id="cardsVal">–</span></div>
+      <div class="bar"><div class="fill-new" id="newBar" style="width:0%"></div><div class="fill-rev" id="revBar" style="width:0%"></div></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--new)"></span>Nouvelles <b id="newVal">–</b></span>
+        <span><span class="dot" style="background:var(--rev)"></span>Révisions <b id="revVal">–</b></span>
+      </div>
+    </div>
+    <div class="status" id="status">
+      <span id="statusTxt">Connexion à Anki…</span>
+      <button class="ghost" id="refreshBtn" title="Actualiser">↻</button>
+    </div>
+  </section>
+
+  <!-- DATE / HEURE / SOLEIL -->
+  <section class="card day a-day">
+    <div class="vtoggle">
+      <button data-view="day" class="active" title="Journée"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2"/><g stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M3.2 12.8l1.1-1.1M11.7 4.3l1.1-1.1"/></g></svg></button>
+      <button data-view="links" title="Liens"><svg viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.6"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.6"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.6"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.6"/></svg></button>
+    </div>
+
+    <div class="view view-day active">
+    <div class="day-top">
+      <div>
+        <div class="time" id="clock">--:--</div>
+        <div class="fulldate" id="fulldate"></div>
+        <div class="daypct"><span class="big" id="dayPct">–</span> <span class="small" id="dayLeft"></span></div>
+      </div>
+    </div>
+    <div class="arc">
+      <svg viewBox="0 0 400 158" preserveAspectRatio="xMidYMax meet">
+        <defs>
+          <radialGradient id="glowN"><stop offset="0" stop-color="#8fa6d8" stop-opacity=".45"/><stop offset="1" stop-color="#8fa6d8" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow"><stop offset="0" stop-color="var(--sun)" stop-opacity=".45"/><stop offset="1" stop-color="var(--sun)" stop-opacity="0"/></radialGradient>
+        </defs>
+        <line x1="10" y1="140" x2="390" y2="140" stroke="var(--line)" stroke-width="1.5"/>
+        <path d="M 30 140 A 170 125 0 0 1 370 140" fill="none" stroke="var(--line)" stroke-width="2" stroke-dasharray="4 6"/>
+        <path id="arcDone" d="" fill="none" stroke="var(--sun)" stroke-width="3" stroke-linecap="round"/>
+        <g id="sun">
+          <circle id="glowFill" r="26" fill="url(#glow)"/>
+          <circle id="sunDisc" r="11" fill="var(--sun)"/>
+          <g id="moonDisc" style="display:none"><title id="moonTitle"></title>
+            <circle r="11" fill="#55648f"/>
+            <path id="moonLit" d="" fill="#f6f1da"/>
+            <circle r="11" fill="none" stroke="#a9b8e0" stroke-opacity=".6" stroke-width="1"/>
+          </g>
+        </g>
+        <g class="hrlbl" data-k="start"><title>Cliquer pour modifier l'heure de début</title><rect x="0" y="138" width="62" height="24" fill="transparent"/><text id="lblStart" x="30" y="154" text-anchor="middle">7 h</text></g>
+        <text id="lblMid" x="200" y="154" text-anchor="middle" style="font-size:15px;fill:var(--muted)">15 h</text>
+        <g class="hrlbl" data-k="end"><title>Cliquer pour modifier l'heure de fin</title><rect x="338" y="138" width="62" height="24" fill="transparent"/><text id="lblEnd" x="370" y="154" text-anchor="middle">23 h</text></g>
+      </svg>
+    </div>
+    </div>
+
+    <div class="view view-links">
+      <div class="links-title">Liens</div>
+      <div class="links" id="links"></div>
+      <form class="linkform" id="linkForm">
+        <input type="text" id="linkName" placeholder="Nom">
+        <input type="text" id="linkUrl" placeholder="https://…">
+        <button class="btn">OK</button>
+        <button type="button" class="ghost" id="linkCancel">✕</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- FEUILLE IMPORTANT -->
+  <aside class="paper a-imp" id="paper">
+    <div class="phead">
+      <div class="ptitle">Important</div>
+      <button class="eye" id="eyeBtn" type="button" aria-expanded="true" title="Réduire">👁️</button>
+    </div>
+    <div class="pbody">
+      <div class="famwrap" id="famWrap"></div>
+
+      <div class="call" id="call">
+        <div class="lbl callh" id="callTitle" role="button" tabindex="0" title="Ajouter une personne · modifier l'historique">Dernier appel <span class="pen" id="callPen">✎</span></div>
+        <div class="people" id="people"></div>
+        <ul class="calllog" id="callLog"></ul>
+        <div class="call-edit"><div class="pbox">
+          <form class="pfield" id="personForm"><input type="text" id="personInput" placeholder="Ajouter une personne" autocomplete="off"><button class="pplus" title="Ajouter">+</button></form>
+          <ul class="editlog" id="editLog"></ul>
+        </div></div>
+      </div>
+
+      <div class="pbox todo">
+        <div class="lbl">À faire</div>
+        <ul class="ptodo" id="ptodo"></ul>
+        <form class="ptodo-add" id="ptodoForm"><input type="text" id="ptodoInput" placeholder="+ ajouter…" autocomplete="off"></form>
+        <button class="ptodo-clear" id="ptodoClear" type="button" hidden>retirer les cochés</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="bottom-right">
+
+  <!-- ITEMS DU JOUR -->
+  <section class="card a-items">
+    <h2>Items du jour <span class="count" id="c-items">0</span></h2>
+    <form class="add" data-list="items" id="itemForm">
+      <div class="ac">
+        <div class="field">
+          <div class="ghosttxt" id="acGhost" aria-hidden="true"></div>
+          <input type="text" id="itemInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Numéro ou nom de l'item (ex : 224)">
+        </div>
+        <ul class="ac-list" id="acList"></ul>
+      </div>
+      <button class="btn">+</button>
+    </form>
+    <div class="scroll">
+      <ul class="list" id="list-items"></ul>
+      <div id="history"></div>
+    </div>
+  </section>
+
+  <!-- À AJOUTER / À CREUSER (toggle) -->
+  <section class="card a-lists">
+    <div class="seg">
+      <button data-tab="anki" class="active">À ajouter dans Anki<span class="n" id="c-anki">0</span></button>
+      <button data-tab="search">À creuser<span class="n" id="c-search">0</span></button>
+    </div>
+    <form class="add" id="todoForm" data-list="anki"><input type="text" placeholder="Notion à mettre en carte plus tard"><button class="btn">+</button></form>
+    <div class="scroll"><ul class="list" id="list-todo"></ul></div>
+    <div class="foot"><button class="ghost" id="clearDone">Effacer les éléments cochés</button></div>
+  </section>
+</div><!-- /bottom-right -->
+</div>
+
+<!-- RÉGLAGES -->
+<button class="themebtn" id="themeBtn" type="button" title="Thème">🌓</button>
+<div class="modal" id="settings">
+  <div class="card">
+    <h2>Réglages <button class="ghost" id="closeSettings">Fermer ✕</button></h2>
+    <div class="sub">Objectifs Anki</div>
+    <label>Temps (minutes) <input type="number" data-set="goals.time" min="1"></label>
+    <label>Nouvelles cartes <input type="number" data-set="goals.new" min="0"></label>
+    <label>Révisions <input type="number" data-set="goals.rev" min="0"></label>
+    <label>Début de journée Anki (heure) <input type="number" data-set="rollover" min="0" max="23"></label>
+    <div class="sub">Pomodoro (minutes)</div>
+    <label>Travail <input type="number" data-set="pomo.work" min="1"></label>
+    <label>Pause courte <input type="number" data-set="pomo.short" min="1"></label>
+    <label>Pause longue <input type="number" data-set="pomo.long" min="1"></label>
+    <label>Pause longue tous les… <input type="number" data-set="pomo.every" min="2"></label>
+    <div class="sub">Synchronisation entre appareils</div>
+    <p class="synchelp">Réglée une fois par appareil. Sur un nouvel appareil, le plus simple est d'ouvrir le « lien de connexion » copié depuis un appareil déjà connecté.</p>
+    <label>URL Supabase <input type="url" id="syncUrl" placeholder="https://xxxx.supabase.co" autocomplete="off"></label>
+    <label>Clé publique <input type="text" id="syncKey" placeholder="sb_publishable_… ou eyJ…" autocomplete="off" spellcheck="false"></label>
+    <label>Code secret <input type="password" id="syncSecret" autocomplete="off"></label>
+    <div class="syncrow"><button class="btn" id="syncSave" type="button">Connecter</button><span class="syncstate" id="syncState">Non connectée</span></div>
+    <div class="syncrow">
+      <button class="ghost" id="syncLink" type="button">🔗 Copier le lien de connexion</button>
+      <button class="ghost" id="syncAddon" type="button">🧩 Copier la config du module Anki</button>
+    </div>
+    <div class="syncrow">
+      <button class="ghost" id="exportBtn" type="button">Exporter</button>
+      <button class="ghost" id="importBtn" type="button">Importer</button>
+      <button class="ghost" id="pushAll" type="button">Envoyer cet appareil vers le cloud</button>
+      <button class="ghost" id="syncOff" type="button">Déconnecter</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json,.txt" hidden>
+  </div>
+</div>
+
+<script>
+/* ================= Stockage ================= */
+const KEY = "ankiTrackerEDN.v1";
+const defaults = {
+  goals: { time: 80, new: 50, rev: 300 },
+  rollover: 4,
+  pomo: { work: 25, short: 5, long: 15, every: 4 },
+  pomoDone: {},       // { "2026-11-13": 3 }
+  items: {}, anki: [], search: []
+};
+let state;
+try { state = Object.assign({}, defaults, JSON.parse(localStorage.getItem(KEY) || "{}")); }
+catch { state = structuredClone(defaults); }
+function normalize() {
+  for (const k of ["items", "pomoDone", "workMs"]) if (!state[k] || typeof state[k] !== "object" || Array.isArray(state[k])) state[k] = {};
+  for (const k of ["anki", "search"]) if (!Array.isArray(state[k])) state[k] = [];
+  state.goals = Object.assign({}, defaults.goals, state.goals);
+  state.pomo  = Object.assign({}, defaults.pomo, state.pomo);
+  state.rollover ??= defaults.rollover;
+  state.theme ||= "auto";   // auto (système) | light | dark
+  state.day = Object.assign({ start: 7, end: 23 }, state.day);
+  state.imp ||= {};
+  state.imp.famDates ||= (state.imp.famDate ? [state.imp.famDate] : []);
+  delete state.imp.famDate;
+  state.imp.collapsed ??= false;
+  state.imp.people ||= [];
+  state.imp.calls ||= [];
+  state.imp.todos ||= [];
+  state.loc ||= { lat: 48.8566, lon: 2.3522, src: "défaut" };   // Paris tant que la géolocalisation n'a pas répondu
+  state.links ||= [
+    { name: "EDNi", url: "https://www.edn.fr/app/courses/courses" },
+    { name: "EDN pro", url: "https://ednpro.app/videos" },
+    { name: "Anatomie", url: "https://human.biodigital.com/explore" }
+  ];
+}
+normalize();
+/* synchro : variables déclarées tôt (save() peut être appelé n'importe quand) */
+const SYNC_CFG_KEY = KEY + ".sync", SYNC_BASE_KEY = KEY + ".syncBase";
+let syncCfg = (() => { try { return JSON.parse(localStorage.getItem(SYNC_CFG_KEY) || "null"); } catch { return null; } })();
+let syncBusy = false, syncAgain = false, syncTimer = 0, syncStatus = { s: "off", msg: "" }, cloudAnki = null, localAnkiAt = 0;
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} scheduleSync(); };
+
+/* ================= Jour Anki ================= */
+function dayStart() {
+  const d = new Date();
+  const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), state.rollover);
+  if (d < s) s.setDate(s.getDate() - 1);
+  return s;
+}
+function dayKey() {
+  const s = dayStart();
+  return `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,"0")}-${String(s.getDate()).padStart(2,"0")}`;
+}
+function frDate(key) {
+  const [y,m,d] = key.split("-").map(Number);
+  return new Date(y, m-1, d).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+}
+
+/* ================= Horloge + soleil (7 h → 23 h) ================= */
+/* ---- Soleil réel (formules NOAA) selon la position ---- */
+function solar(date, lat, lon) {
+  const R = Math.PI / 180, D = 180 / Math.PI;
+  const jc = (date.getTime() / 86400000 + 2440587.5 - 2451545) / 36525;
+  const gml = (280.46646 + jc * (36000.76983 + jc * 0.0003032)) % 360;
+  const an = 357.52911 + jc * (35999.05029 - 0.0001537 * jc);
+  const ecc = 0.016708634 - jc * (0.000042037 + 0.0000001267 * jc);
+  const ctr = Math.sin(an * R) * (1.914602 - jc * (0.004817 + 0.000014 * jc)) + Math.sin(2 * an * R) * (0.019993 - 0.000101 * jc) + Math.sin(3 * an * R) * 0.000289;
+  const app = gml + ctr - 0.00569 - 0.00478 * Math.sin((125.04 - 1934.136 * jc) * R);
+  const mo = 23 + (26 + (21.448 - jc * (46.815 + jc * (0.00059 - jc * 0.001813))) / 60) / 60;
+  const ob = mo + 0.00256 * Math.cos((125.04 - 1934.136 * jc) * R);
+  const dec = Math.asin(Math.sin(ob * R) * Math.sin(app * R));
+  const y = Math.tan(ob * R / 2) ** 2;
+  const eq = 4 * D * (y * Math.sin(2 * gml * R) - 2 * ecc * Math.sin(an * R) + 4 * ecc * y * Math.sin(an * R) * Math.cos(2 * gml * R) - 0.5 * y * y * Math.sin(4 * gml * R) - 1.25 * ecc * ecc * Math.sin(2 * an * R));
+  return { dec, eq, R, D };
+}
+function sunElevation(date, lat, lon) {
+  const { dec, eq, R, D } = solar(date, lat, lon);
+  const tUTC = date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60;
+  const ha = (((tUTC + eq + 4 * lon) % 1440) + 1440) % 1440 / 4 - 180;
+  const c = Math.sin(lat * R) * Math.sin(dec) + Math.cos(lat * R) * Math.cos(dec) * Math.cos(ha * R);
+  return 90 - Math.acos(Math.max(-1, Math.min(1, c))) * D;
+}
+function sunTimes(date, lat, lon) {   // lever / coucher du jour local de `date` (null si jour/nuit polaire)
+  const base = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12);
+  const { dec, eq, R, D } = solar(new Date(base - lon * 240000), lat, lon);
+  const c = Math.cos(90.833 * R) / (Math.cos(lat * R) * Math.cos(dec)) - Math.tan(lat * R) * Math.tan(dec);
+  if (c < -1 || c > 1) return null;
+  const ha = Math.acos(c) * D, mid = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  return { rise: new Date(mid + (720 - 4 * (lon + ha) - eq) * 60000), set: new Date(mid + (720 - 4 * (lon - ha) - eq) * 60000) };
+}
+function locateMe() {
+  try { navigator.geolocation.getCurrentPosition(
+    pos => { state.loc = { lat: pos.coords.latitude, lon: pos.coords.longitude, src: "gps" }; save(); tickClock(); },
+    () => {}, { maximumAge: 6 * 3600e3, timeout: 15000 }); } catch {}
+}
+/* ---- Lune : phase réelle (cycle synodique depuis la nouvelle lune du 6/01/2000) ---- */
+const SYN = 29.530588853;
+function moonAge(date) { return (((date.getTime() / 86400000 + 2440587.5 - 2451550.1) % SYN) + SYN) % SYN; }
+function drawMoon(date) {
+  const age = moonAge(date), p = age / SYN, r = 11, c = Math.cos(2 * Math.PI * p), rx = Math.abs(c) * r;
+  let d;
+  if (p < 0.5) d = `M0 ${-r}A${r} ${r} 0 0 1 0 ${r}A${rx.toFixed(2)} ${r} 0 0 ${p < 0.25 ? 0 : 1} 0 ${-r}Z`;     // croissante : éclairée à droite
+  else d = `M0 ${-r}A${r} ${r} 0 0 0 0 ${r}A${rx.toFixed(2)} ${r} 0 0 ${p < 0.75 ? 0 : 1} 0 ${-r}Z`;               // décroissante : éclairée à gauche
+  if (p < 0.012 || p > 0.988) d = "";
+  document.getElementById("moonLit").setAttribute("d", d);
+  const names = ["Nouvelle lune", "Premier croissant", "Premier quartier", "Lune gibbeuse croissante", "Pleine lune", "Lune gibbeuse décroissante", "Dernier quartier", "Dernier croissant"];
+  document.getElementById("moonTitle").textContent = `${names[Math.round(p * 8) % 8]} · ${Math.round((1 - c) / 2 * 100)} % éclairée · jour ${Math.floor(age) + 1} du cycle`;
+}
+const CX = 200, CY = 140, RX = 170, RY = 125;
+function arcPoint(p) {               // p entre 0 et 1, de gauche à droite
+  const a = Math.PI * (1 - p);
+  return [CX + RX * Math.cos(a), CY - RY * Math.sin(a)];
+}
+function tickClock() {
+  const now = new Date();
+  document.getElementById("clock").textContent =
+    now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  document.getElementById("fulldate").textContent =
+    now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  const h = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  const p = Math.min(1, Math.max(0, (h - state.day.start) / (state.day.end - state.day.start)));
+  const [x, y] = arcPoint(p);
+  const sun = document.getElementById("sun");
+  sun.setAttribute("transform", `translate(${x},${y})`);
+  sun.style.opacity = (h < state.day.start || h >= state.day.end) ? .35 : 1;
+  document.getElementById("arcDone").setAttribute("d",
+    p > 0 ? `M 30 140 A ${RX} ${RY} 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}` : "");
+
+  /* soleil le jour (selon la position), lune la nuit (avec sa vraie phase) */
+  {
+    const el = sunElevation(now, state.loc.lat, state.loc.lon), night = el < -0.833;
+    if (night) sun.style.opacity = 1;
+    document.getElementById("sunDisc").style.display = night ? "none" : "";
+    document.getElementById("moonDisc").style.display = night ? "" : "none";
+    document.getElementById("glowFill").setAttribute("fill", night ? "url(#glowN)" : "url(#glow)");
+    if (night) drawMoon(now);
+  }
+
+  const pct = document.getElementById("dayPct"), left = document.getElementById("dayLeft");
+  if (h < state.day.start) { pct.textContent = "0 %"; left.textContent = `Début à ${fmtH(state.day.start)}`; }
+  else if (h >= state.day.end) { pct.textContent = "100 %"; left.textContent = "Journée terminée"; }
+  else {
+    pct.textContent = Math.round(p * 100) + " %";
+    const rest = state.day.end - h, rh = Math.floor(rest), rm = Math.round((rest - rh) * 60);
+    left.textContent = `reste ${rh} h ${String(rm).padStart(2, "0")}`;
+  }
+}
+
+/* ================= Pomodoro ================= */
+const ARC = 2 * Math.PI * 44 * 0.75;   // arc de 270°
+const pomo = { mode: "work", running: false, endAt: 0, remaining: state.pomo.work * 60 * 1000, streak: 0, over: false, seg: 0, lastSave: 0 };
+const modeLabel = { work: "Travail", short: "Pause courte", long: "Pause longue" };
+const modeLen = m => state.pomo[m] * 60 * 1000;
+
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, .25, .5].forEach(t => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(.2, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + t + .2);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + .2);
+    });
+  } catch {}
+}
+/* temps de travail du jour : on cumule le segment en cours (dépassement inclus) */
+function flushWork(force) {
+  if (!(pomo.running && pomo.mode === "work" && pomo.seg)) return;
+  const now = Date.now(), k = dayKey();
+  state.workMs[k] = (state.workMs[k] || 0) + (now - pomo.seg); pomo.seg = now;
+  if (force || now - pomo.lastSave > 10000) { save(); pomo.lastSave = now; }
+}
+function fmtWork(ms) {
+  const m = Math.floor(ms / 60000), h = Math.floor(m / 60);
+  return h ? `${h} h ${String(m % 60).padStart(2, "0")}` : `${m} min`;
+}
+function setMode(m) {
+  flushWork(true);
+  pomo.mode = m; pomo.running = false; pomo.over = false; pomo.remaining = modeLen(m);
+  renderPomo();
+}
+function nextMode(countIt) {
+  if (pomo.mode === "work") {
+    if (countIt) {
+      const k = dayKey(); state.pomoDone[k] = (state.pomoDone[k] || 0) + 1; save();
+      pomo.streak++;
+    }
+    setMode(pomo.streak > 0 && pomo.streak % state.pomo.every === 0 ? "long" : "short");
+  } else setMode("work");
+}
+function renderPomo() {
+  const raw = pomo.running ? pomo.endAt - Date.now() : pomo.remaining;
+  const neg = pomo.mode === "work" && pomo.over && raw < 0;
+  const ms = neg ? raw : Math.max(0, raw);
+  const s = Math.ceil(Math.abs(ms) / 1000);
+  const txt = `${neg ? "−" : ""}${String(Math.floor(s / 60)).padStart(2,"0")}:${String(s % 60).padStart(2,"0")}`;
+  document.getElementById("pomoClock").textContent = txt;
+  document.getElementById("pomoClock").classList.toggle("over", neg);
+  { const k = dayKey(); document.getElementById("workTot").textContent =
+      fmtWork((state.workMs[k] || 0) + (pomo.running && pomo.mode === "work" && pomo.seg ? Date.now() - pomo.seg : 0)); }
+  document.getElementById("pomoMode").textContent = modeLabel[pomo.mode];
+  const prog = neg ? 1 : Math.min(1, Math.max(0, 1 - ms / modeLen(pomo.mode)));
+  document.getElementById("ringFg").setAttribute("stroke-dashoffset", (ARC * (1 - prog)).toFixed(2));
+  const th = (225 + 270 * prog) * Math.PI / 180;   // angle façon cadran, depuis midi, sens horaire
+  document.getElementById("avo").setAttribute("transform",
+    `translate(${(50 + 44 * Math.sin(th)).toFixed(2)},${(50 - 44 * Math.cos(th)).toFixed(2)})`);
+  document.getElementById("ring").classList.toggle("break", pomo.mode !== "work");
+  const sb = document.getElementById("pomoStart");
+  const want = pomo.running ? "pause" : "play";
+  if (sb.dataset.icon !== want) { sb.innerHTML = want === "pause" ? `<svg viewBox="0 0 16 16"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1.1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1.1"/></svg>` : `<svg viewBox="0 0 16 16"><path d="M4.5 2.6c0-.8.9-1.3 1.6-.9l7.3 4.6c.6.4.6 1.3 0 1.7l-7.3 4.6c-.7.4-1.6-.1-1.6-.9z"/></svg>`; sb.dataset.icon = want; }
+  sb.title = pomo.running ? "Pause" : (ms < modeLen(pomo.mode) ? "Reprendre" : "Démarrer");
+  const nDone = state.pomoDone[dayKey()] || 0;
+  document.getElementById("pomoCount").textContent = nDone;
+  document.title = pomo.running ? `${txt} · ${modeLabel[pomo.mode]}` : "Anki Tracker – EDN";
+}
+function tickPomo() {
+  flushWork(false);
+  if (pomo.running && Date.now() >= pomo.endAt) {
+    if (pomo.mode === "work") {
+      if (!pomo.over) {   // fin du pomodoro : on compte la tomate mais le chrono continue en négatif
+        pomo.over = true; beep();
+        const k = dayKey(); state.pomoDone[k] = (state.pomoDone[k] || 0) + 1; save(); pomo.streak++;
+        try { if (Notification.permission === "granted") new Notification("Pomodoro terminé : le chrono continue (passe pour la pause)"); } catch {}
+      }
+    } else {
+      beep();
+      try { if (Notification.permission === "granted") new Notification("Pause terminée : au travail !"); } catch {}
+      nextMode(true);
+    }
+  }
+  renderPomo();
+}
+document.getElementById("pomoStart").onclick = () => {
+  if (pomo.running) {
+    flushWork(true);
+    pomo.remaining = pomo.mode === "work" && pomo.over ? pomo.endAt - Date.now() : Math.max(0, pomo.endAt - Date.now()); pomo.running = false;
+  } else {
+    pomo.endAt = Date.now() + pomo.remaining; pomo.running = true; pomo.seg = Date.now();
+    try { if (Notification.permission === "default") Notification.requestPermission(); } catch {}
+  }
+  renderPomo();
+};
+document.getElementById("pomoSkip").onclick = () => nextMode(false);   // le dépassement éventuel est déjà compté
+document.getElementById("pomoReset").onclick = () => { pomo.streak = 0; setMode("work"); };
+
+/* ================= Anki : en direct (AnkiConnect) ou via le cloud ================= */
+/* En direct seulement quand la page est ouverte en fichier local ou sur localhost (sur Mac, Anki ouvert).
+   En ligne (téléphone, autre navigateur…), les chiffres viennent du cloud, envoyés par le module Anki. */
+const LOCAL_ANKI = location.protocol === "file:" || /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+async function anki(action, params = {}) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 3000);
+  try {
+    const r = await fetch("http://127.0.0.1:8765", { method: "POST", body: JSON.stringify({ action, version: 6, params }), signal: ctl.signal });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    return j.result;
+  } finally { clearTimeout(t); }
+}
+let lastStats = null, lastAnkiPush = "";
+const hm = ts => new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function setStatus(text, err) {
+  const st = document.getElementById("status"), txt = document.getElementById("statusTxt");
+  st.classList.toggle("err", !!err); txt.textContent = text;
+}
+async function refreshLocal() {
+  const [newIds, revIds, ratedIds] = await Promise.all([
+    anki("findCards", { query: "introduced:1" }),
+    anki("findCards", { query: "rated:1 -introduced:1" }),
+    anki("findCards", { query: "rated:1" })
+  ]);
+  let ms = 0;
+  if (ratedIds.length) {
+    const since = dayStart().getTime();
+    const reviews = await anki("getReviewsOfCards", { cards: ratedIds });
+    for (const list of Object.values(reviews)) for (const rv of list) if (rv.id >= since) ms += rv.time;
+  }
+  const data = { day: dayKey(), min: ms / 60000, new: newIds.length, rev: revIds.length, at: Date.now(), src: "page" };
+  renderAnki(data.min, data.new, data.rev);
+  localAnkiAt = Date.now();
+  setStatus("Synchronisé avec Anki · " + hm(Date.now()));
+  // on partage aussi ces chiffres avec les autres appareils (utile si le module Anki n'est pas installé)
+  const sig = [data.day, data.new, data.rev, Math.round(data.min * 10)].join("|");
+  if (syncCfg && sig !== lastAnkiPush) {
+    try { await rpc("dash_put", { p_id: "anki", p_data: data }); lastAnkiPush = sig; } catch {}
+  }
+}
+async function refresh() {
+  if (LOCAL_ANKI) {
+    try { await refreshLocal(); } catch { localAnkiAt = 0; }
+  }
+  if (syncCfg) await syncNow();
+  else if (!localAnkiAt) setStatus(LOCAL_ANKI ? "Anki injoignable : ouvre Anki (avec AnkiConnect)." : "Synchronisation non configurée : ouvre les réglages.", true);
+}
+/* chiffres Anki reçus du cloud (si on n'a pas de lecture directe récente) */
+function renderAnkiFromCloud() {
+  if (localAnkiAt && Date.now() - localAnkiAt < 90000) return;
+  if (syncStatus.s === "err") { setStatus("Cloud injoignable : " + syncStatus.msg, true); return; }
+  if (!cloudAnki) { setStatus("Aucune donnée Anki reçue pour l'instant (module Anki installé ?)", true); return; }
+  const a = cloudAnki;
+  if (a.day === dayKey()) renderAnki(+a.min || 0, +a.new || 0, +a.rev || 0);
+  else renderAnki(0, 0, 0);
+  const when = a.at ? hm(a.at) + (dayDiff(new Date(), new Date(a.at)) ? " (" + new Date(a.at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) + ")" : "") : "?";
+  setStatus("Anki via le cloud · données de " + when);
+}
+function renderAnki(min, nNew, nRev) {
+  lastStats = [min, nNew, nRev];
+  const g = state.goals;
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  const fmt = h ? `${h} h ${String(m).padStart(2,"0")}` : `${m} min`;
+  document.getElementById("timeBar").style.width = Math.min(100, (min / g.time) * 100) + "%";
+  document.getElementById("timeVal").innerHTML = min >= g.time
+    ? `<span class="done">✓ ${fmt}</span> / ${g.time} min` : `<b>${fmt}</b> / ${g.time} min`;
+  const goal = Math.max(1, g.new + g.rev), total = nNew + nRev, scale = Math.max(goal, total);
+  document.getElementById("newBar").style.width = (nNew / scale) * 100 + "%";
+  document.getElementById("revBar").style.width = (nRev / scale) * 100 + "%";
+  document.getElementById("cardsVal").innerHTML = total >= goal
+    ? `<span class="done">✓ ${total}</span> / ${goal}` : `<b>${total}</b> / ${goal}`;
+  document.getElementById("newVal").textContent = `${nNew}/${g.new}`;
+  document.getElementById("revVal").textContent = `${nRev}/${g.rev}`;
+}
+document.getElementById("refreshBtn").onclick = () => { localAnkiAt = 0; refresh(); };
+
+/* ================= Réglages ================= */
+const getPath = p => p.split(".").reduce((o, k) => o[k], state);
+const setPath = (p, v) => { const ks = p.split("."), last = ks.pop(); ks.reduce((o, k) => o[k], state)[last] = v; };
+function fillSettings() {
+  document.querySelectorAll("[data-set]").forEach(el => { if (el !== document.activeElement) el.value = getPath(el.dataset.set); });
+}
+document.querySelectorAll("[data-set]").forEach(el => {
+  el.value = getPath(el.dataset.set);
+  el.addEventListener("input", () => {
+    const v = parseInt(el.value, 10);
+    if (isNaN(v) || v < +el.min || (el.max && v > +el.max)) return;
+    setPath(el.dataset.set, v); save();
+    if (el.dataset.set === "pomo." + pomo.mode && !pomo.running) pomo.remaining = modeLen(pomo.mode);
+    if (lastStats) renderAnki(...lastStats);
+    if (el.dataset.set === "rollover") { renderLists(); refresh(); }
+    renderPomo();
+  });
+});
+const modal = document.getElementById("settings");
+document.querySelectorAll("[data-open]").forEach(b => b.onclick = () => modal.classList.add("open"));
+document.getElementById("closeSettings").onclick = () => modal.classList.remove("open");
+modal.addEventListener("click", e => { if (e.target === modal) modal.classList.remove("open"); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") modal.classList.remove("open"); });
+
+/* ================= Listes ================= */
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const getList = name => name === "items" ? (state.items[dayKey()] ||= []) : state[name];
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const openIds = new Set();
+function listHTML(arr, name, day) {
+  if (!arr.length) return `<li class="empty">Rien pour l'instant.</li>`;
+  return arr.map(x => `
+    <li class="${x.done ? "checked" : ""}${openIds.has(x.id) ? " open" : ""}" data-id="${x.id}">
+      <input type="checkbox" ${x.done ? "checked" : ""} data-act="toggle" data-list="${name}" data-day="${day||""}" data-id="${x.id}">
+      <span class="txt" data-toggle>${esc(x.text)}</span>
+      <button class="ghost del" data-act="del" data-list="${name}" data-day="${day||""}" data-id="${x.id}">✕</button>
+    </li>`).join("");
+}
+let todoTab = (() => { try { return localStorage.getItem(KEY + ".tab") || "anki"; } catch { return "anki"; } })();
+const placeholders = { anki: "Notion à mettre en carte plus tard", search: "Point à vérifier / approfondir" };
+function renderLists() {
+  const today = dayKey();
+  document.getElementById("list-items").innerHTML = listHTML(getList("items"), "items", today);
+  document.getElementById("list-todo").innerHTML = listHTML(state[todoTab], todoTab, "");
+  for (const name of ["items","anki","search"])
+    document.getElementById("c-" + name).textContent = getList(name).filter(x => !x.done).length;
+  document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("active", b.dataset.tab === todoTab));
+  const f = document.getElementById("todoForm");
+  f.dataset.list = todoTab; f.querySelector("input").placeholder = placeholders[todoTab];
+  const past = Object.keys(state.items).filter(k => k !== today && state.items[k].length).sort().reverse().slice(0, 7);
+  document.getElementById("history").innerHTML = past.map(k =>
+    `<div class="sub">${frDate(k)}</div><ul class="list">${listHTML(state.items[k], "items", k)}</ul>`).join("");
+}
+document.querySelectorAll("form.add").forEach(f => f.addEventListener("submit", e => {
+  e.preventDefault();
+  const inp = f.querySelector("input"), text = inp.value.trim();
+  if (!text) return;
+  getList(f.dataset.list).push({ id: uid(), text, done: false });
+  inp.value = ""; save(); renderLists();
+}));
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.matches && t.matches("[data-toggle]")) {
+    const li = t.closest("li"), id = li.dataset.id;
+    if (openIds.has(id)) openIds.delete(id); else openIds.add(id);
+    li.classList.toggle("open");
+    return;
+  }
+  if (t.dataset.act) {
+    const arr = t.dataset.list === "items" ? state.items[t.dataset.day] : state[t.dataset.list];
+    const i = arr ? arr.findIndex(x => x.id === t.dataset.id) : -1;
+    if (i < 0) return;
+    if (t.dataset.act === "toggle") arr[i].done = t.checked;
+    if (t.dataset.act === "del") arr.splice(i, 1);
+    save(); renderLists();
+  }
+  if (t.id === "clearDone") { state[todoTab] = state[todoTab].filter(x => !x.done); save(); renderLists(); }
+  const tb = t.closest(".seg button");
+  if (tb) { todoTab = tb.dataset.tab; try { localStorage.setItem(KEY + ".tab", todoTab); } catch {} renderLists(); }
+});
+
+const EDN = [[1,"La relation médecin-malade : communication, formation et personnalisation de la prise en charge médicale"],[2,"Les valeurs professionnelles du médecin et des autres professions de santé"],[3,"Le raisonnement et la décision en médecine. La médecine fondée sur les preuves (Evidence Based Medicine, EBM)"],[4,"Qualité et sécurité des soins. La sécurité du patient. La gestion des risques"],[5,"Responsabilités médicale pénale, civile, administrative et disciplinaire"],[6,"L'organisation de l'exercice clinique et les méthodes qui permettent de sécuriser le parcours du patient"],[7,"Les droits individuels et collectifs du patient"],[8,"Les discriminations"],[9,"Introduction à l’éthique médicale"],[10,"Approches transversales du corps"],[11,"Violences et santé"],[12,"Violences sexuelles"],[13,"Certificats médicaux. Décès et législation"],[14,"La mort"],[15,"Soins psychiatriques sans consentement"],[16,"Organisation du système de soins. Sa régulation. Les indicateurs"],[17,"Télémédecine, télésanté et téléservices en santé"],[18,"Santé et numérique"],[19,"La sécurité sociale. L'assurance maladie. Les assurances complémentaires"],[20,"La méthodologie de la recherche en santé"],[21,"Mesure de l'état de santé de la population"],[22,"Maladies rares"],[23,"Grossesse normale"],[24,"Principales complications de la grossesse"],[25,"Grossesse extra-utérine"],[26,"Douleur abdominale aiguë chez une femme enceinte"],[27,"Prévention des risques fœtaux : infection, médicaments, toxiques, irradiation"],[28,"Connaître les particularités de l'infection urinaire au cours de la grossesse"],[29,"Connaître les principaux risques professionnels pour la maternité, liés au travail de la mère"],[30,"Prématurité et retard de croissance intra-utérin : facteurs de risque et prévention"],[31,"Accouchement, délivrance et suites de couches normales"],[32,"Évaluation et soins du nouveau-né à terme"],[33,"Allaitement maternel"],[34,"Suites de couches pathologiques : pathologie maternelle dans les 40 jours"],[35,"Anomalies du cycle menstruel"],[36,"Contraception"],[37,"Interruption volontaire de grossesse"],[38,"Infertilité du couple : conduite de la première consultation"],[39,"Assistance médicale à la procréation : principaux aspects biologiques, médicaux et éthiques"],[40,"Algies pelviennes chez la femme"],[41,"Endométriose"],[42,"Aménorrhée"],[43,"Hémorragie génitale chez la femme"],[44,"Tuméfaction pelvienne chez la femme"],[45,"Spécificités des maladies génétiques"],[46,"Médecine génomique"],[47,"Suivi d'un nourrisson, d'un enfant et d'un adolescent normal. Dépistage des anomalies orthopédiques, des troubles visuels, auditifs et dentaires. Examens de santé obligatoires. Médecine scolaire. Mortalité et morbidité infantiles"],[48,"Alimentation et besoins nutritionnels du nourrisson et de l'enfant"],[49,"Puberté normale et pathologique"],[50,"Pathologie génito-scrotale chez le garçon et chez l'homme"],[51,"Troubles de la miction chez l'enfant"],[52,"Strabisme et amblyopie de l'enfant"],[53,"Retard de croissance staturo-pondérale"],[54,"Boiterie chez l'enfant"],[55,"Développement psychomoteur du nourrisson et de l'enfant"],[56,"L'enfant handicapé : orientation et prise en charge (voir items 118, 121)"],[57,"Maltraitance et enfants en danger. Protection maternelle et infantile"],[58,"Sexualité normale et ses troubles"],[59,"Sujets en situation de précarité"],[60,"Connaître les facteurs de risque, prévention, dépistage des troubles psychiques de l'enfant à la personne âgée"],[61,"Connaître les bases des classifications des troubles mentaux de l'enfant à la personne âgée"],[62,"Décrire l'organisation de l'offre de soins en psychiatrie, de l'enfant à la personne âgée"],[63,"Trouble schizophrénique"],[64,"Trouble bipolaire"],[65,"Trouble délirant persistant"],[66,"Diagnostiquer : un trouble dépressif, un trouble anxieux généralisé, un trouble panique, un trouble phobique, un trouble obsessionnel compulsif, un état de stress post-traumatique, un trouble de l'adaptation (de l'enfant à la personne âgée), un trouble de la personnalité"],[67,"Troubles envahissants du développement (voir items 118, 121, 122, 138)"],[68,"Troubles du comportement de l'adolescent"],[69,"Troubles psychiques de la grossesse et du post-partum"],[70,"Troubles psychiques du sujet âgé"],[71,"Troubles des conduites alimentaires chez l'adolescent et l'adulte (voir item 251)"],[72,"Troubles à symptomatologie somatique et apparentés à tous les âges"],[73,"Différents types de techniques psychothérapeutiques"],[74,"Prescription et surveillance des psychotropes (voir item 330)"],[75,"Addiction au tabac"],[76,"Addiction à l'alcool"],[77,"Addiction aux médicaments psychotropes (benzodiazépines et apparentés) (voir item 322)"],[78,"Addiction au cannabis, à la cocaïne, aux amphétamines, aux opiacés, aux drogues de synthèse (voir item 322)"],[79,"Addictions comportementales"],[80,"Dopage et conduites dopantes (voir item 256)"],[81,"Altération chronique de la vision"],[82,"Altération aiguë de la vision"],[83,"Infections et inflammations oculaires"],[84,"Glaucomes"],[85,"Troubles de la réfraction"],[86,"Pathologie des paupières"],[87,"Epistaxis"],[88,"Trouble aigu de la parole. Dysphonie"],[89,"Altération de la fonction auditive"],[90,"Pathologie des glandes salivaires"],[91,"Déficit neurologique récent (voir item 340)"],[92,"Déficit moteur et/ou sensitif des membres"],[93,"Compression médullaire non traumatique et syndrome de la queue de cheval"],[94,"Rachialgie"],[95,"Radiculalgie et syndrome canalaire"],[96,"Neuropathies périphériques"],[97,"Polyradiculonévrite aiguë inflammatoire (syndrome de Guillain-Barré)"],[98,"Myasthénie"],[99,"Migraine, névralgie du trijumeau et algies de la face"],[100,"Céphalée inhabituelle aiguë et chronique chez l'adulte et l'enfant"],[101,"Paralysie faciale"],[102,"Diplopie"],[103,"Vertige"],[104,"Sclérose en plaques"],[105,"Épilepsie de l'enfant et de l'adulte"],[106,"Maladie de Parkinson"],[107,"Mouvements anormaux"],[108,"Confusion, démences (voir item 132)"],[109,"Troubles de la marche et de l'équilibre"],[110,"Troubles du sommeil de l'enfant et de l'adulte"],[111,"Dermatoses faciales : acné, rosacée, dermatite séborrhéique"],[112,"Dermatose bulleuse touchant la peau et/ou les muqueuses externes"],[113,"Hémangiomes et malformations vasculaires cutanées"],[114,"Exanthème et érythrodermie de l'adulte et de l'enfant (voir item 164)"],[115,"Toxidermies"],[116,"Prurit"],[117,"Psoriasis"],[118,"La personne handicapée : bases de l'évaluation fonctionnelle et thérapeutique"],[119,"Soin et accompagnement dans la maladie chronique et le handicap"],[120,"Complications de l'immobilité et du décubitus. Prévention et prise en charge"],[121,"Le handicap psychique (voir item 56 et 118)"],[122,"Principales techniques de rééducation et de réadaptation (voir item 55)"],[123,"Vieillissement normal : aspects biologiques, fonctionnels et relationnels. Données épidémiologiques et sociologiques. Prévention du vieillissement pathologique"],[124,"Ménopause, insuffisance ovarienne prématurée, andropause, déficit androgénique lié à l’âge"],[125,"Troubles de la miction et incontinence urinaire de l'adulte et du sujet âgé"],[126,"Trouble de l'érection"],[127,"Hypertrophie bénigne de la prostate"],[128,"Ostéopathies fragilisantes"],[129,"Arthrose"],[130,"La personne âgée malade : particularités sémiologiques, psychologiques et thérapeutiques"],[131,"Troubles de la marche et de l'équilibre (voir item 109)"],[132,"Troubles cognitifs du sujet âgé (voir item 108)"],[133,"Autonomie et dépendance chez le sujet âgé"],[134,"Bases neurophysiologiques, mécanismes physiopathologiques d'une douleur aiguë et d'une douleur chronique"],[135,"Thérapeutiques antalgiques, médicamenteuses et non médicamenteuses"],[136,"Anesthésie locale, locorégionale et générale"],[137,"Douleur chez l'enfant : évaluation et traitements antalgiques"],[138,"Douleur chez la personne vulnérable"],[139,"Soins palliatifs pluridisciplinaires chez un malade en phase palliative ou terminale d'une maladie grave, chronique ou létale (1). Principaux repères cliniques. Modalités d'organisation des équipes, en établissement de santé et en ambulatoire"],[140,"Soins palliatifs pluridisciplinaires chez un malade en phase palliative ou terminale d'une maladie grave, chronique ou létale (2). Accompagnement de la personne malade et de son entourage. Principaux repères éthiques"],[141,"Soins palliatifs pluridisciplinaires chez un malade en phase palliative ou terminale d'une maladie grave, chronique ou létale (3). La sédation pour détresse en phase terminale et dans des situations spécifiques et complexes en fin de vie. Réponse à la demande d'euthanasie ou de suicide assisté"],[142,"Connaître les aspects spécifiques des soins palliatifs en pédiatrie"],[143,"Connaître les aspects spécifiques des soins palliatifs en réanimation"],[144,"Deuil normal et pathologique"],[145,"Surveillance des maladies infectieuses transmissibles"],[146,"Vaccinations"],[147,"Fièvre aiguë chez l'enfant et l'adulte"],[148,"Infections naso-sinusiennes de l'adulte et de l'enfant"],[149,"Angines de l'adulte et de l'enfant et rhinopharyngites de l'enfant"],[150,"Otites infectieuses de l'adulte et de l'enfant"],[151,"Méningites, méningoencéphalites, abcès cérébral chez l'adulte et l'enfant"],[152,"Endocardite infectieuse"],[153,"Surveillance des porteurs de valve et prothèses vasculaires"],[154,"Infections broncho pulmonaires communautaires de l'adulte et de l'enfant"],[155,"Infections cutanéo-muqueuses et des phanères, bactériennes et mycosiques de l'adulte et de l'enfant"],[156,"Infections ostéo articulaires (IOA) de l'enfant et de l'adulte"],[157,"Septicémie/Bactériémie/Fongémie de l'adulte et de l'enfant"],[158,"Sepsis et choc septique de l’enfant et de l’adulte"],[159,"Tuberculose de l'adulte et de l'enfant"],[160,"Tétanos"],[161,"Infections urinaires de l'enfant et de l'adulte"],[162,"Infections sexuellement transmissibles (IST) : gonococcies, chlamydioses, syphilis, papillomavirus humain (HPV), trichomonose"],[163,"Coqueluche"],[164,"Exanthèmes fébriles de l'enfant"],[165,"Oreillons"],[166,"Grippe"],[167,"Hépatites virales"],[168,"Infections à herpès virus du sujet immunocompétent"],[169,"Infections à VIH"],[170,"Paludisme"],[171,"Gale et pédiculose"],[172,"Parasitoses digestives : giardiose, amoebose, téniasis, ascaridiose, oxyurose, anguillulose, cryptosporidiose"],[173,"Zoonoses"],[174,"Pathologie infectieuse chez les migrants adultes et enfants"],[175,"Voyage en pays tropical de l'adulte et de l'enfant : conseils avant le départ, pathologies du retour : fièvre, diarrhée, manifestations cutanées"],[176,"Diarrhées infectieuses de l'adulte et de l'enfant"],[177,"Prescription et surveillance des anti-infectieux chez l'adulte et l'enfant (voir item 330)"],[178,"Risques émergents, bioterrorisme, maladies hautement transmissibles"],[179,"Risques sanitaires liés à l'eau et à l'alimentation. Toxi-infections alimentaires"],[180,"Risques sanitaires liés aux irradiations. Radioprotection"],[181,"La sécurité sanitaire des produits destinés à l'homme. La veille sanitaire (voir item 325)"],[182,"Environnement professionnel et santé au travail"],[183,"Organisation de la médecine du travail. Prévention des risques professionnels"],[184,"Accidents du travail et maladies professionnelles : définitions et enjeux"],[185,"Réaction inflammatoire : aspects biologiques et cliniques. Conduite à tenir"],[186,"Hypersensibilités et allergies chez l'enfant et l'adulte : aspects physiopathologiques, épidémiologiques, diagnostiques et principes de traitement"],[187,"Hypersensibilités et allergies cutanéomuqueuses chez l'enfant et l'adulte. Urticaire, dermatites atopique et de contact, conjonctivite allergique"],[188,"Hypersensibilité et allergies respiratoires chez l'enfant et chez l'adulte. Asthme, rhinite"],[189,"Déficit immunitaire"],[190,"Fièvre prolongée"],[191,"Fièvre chez un patient immunodéprimé"],[192,"Pathologies auto-immunes : aspects épidémiologiques, diagnostiques et principes de traitement"],[193,"Connaître les principaux types de vascularite systémique, les organes cibles, les outils diagnostiques et les moyens thérapeutiques"],[194,"Lupus systémique. Syndrome des anti-phospholipides (SAPL)"],[195,"Artérite à cellules géantes"],[196,"Polyarthrite rhumatoïde"],[197,"Spondyloarthrite"],[198,"Arthropathie microcristalline"],[199,"Syndrome douloureux régional complexe (ex algodystrophie)"],[200,"Douleur et épanchement articulaire. Arthrite d'évolution récente"],[201,"Transplantation d'organes : aspects épidémiologiques et immunologiques ; principes de traitement; complications et pronostic ; aspects éthiques et légaux. Prélèvements d'organes et législation"],[202,"Biothérapies et thérapies ciblées"],[203,"Dyspnée aiguë et chronique"],[204,"Toux chez l'enfant et chez l'adulte (avec le traitement)"],[205,"Hémoptysie"],[206,"Épanchement pleural liquidien"],[207,"Opacités et masses intra-thoraciques chez l'enfant et chez l'adulte"],[208,"Insuffisance respiratoire chronique"],[209,"Bronchopneumopathie chronique obstructive chez l'adulte"],[210,"Pneumopathie interstitielle diffuse"],[211,"Sarcoïdose"],[212,"Hémogramme chez l'adulte et l'enfant : indications et interprétation"],[213,"Anémie chez l'adulte et l'enfant"],[214,"Thrombopénie chez l'adulte et l'enfant"],[215,"Purpuras chez l'adulte et l'enfant"],[216,"Syndrome hémorragique d'origine hématologique"],[217,"Syndrome mononucléosique"],[218,"Éosinophilie"],[219,"Pathologie du fer chez l'adulte et l'enfant"],[220,"Adénopathie superficielle de l'adulte et de l'enfant"],[221,"Athérome : épidémiologie et physiopathologie. Le malade poly-athéromateux"],[222,"Facteurs de risque cardio-vasculaire et prévention"],[223,"Dyslipidémies"],[224,"Hypertension artérielle de l'adulte et de l’enfant"],[225,"Artériopathie oblitérante de l'aorte, des artères viscérales et des membres inférieurs ; anévrysmes"],[226,"Thrombose veineuse profonde et embolie pulmonaire (voir item 330)"],[227,"Insuffisance veineuse chronique. Varices"],[228,"Ulcère de jambe"],[229,"Surveillance et complications des abords veineux"],[230,"Douleur thoracique aiguë"],[231,"Électrocardiogramme : indications et interprétations"],[232,"Fibrillation atriale"],[233,"Valvulopathies"],[234,"Insuffisance cardiaque de l'adulte"],[235,"Péricardite aiguë"],[236,"Troubles de la conduction intracardiaque"],[237,"Palpitations"],[238,"Souffle cardiaque chez l'enfant"],[239,"Acrosyndromes (phénomène de Raynaud, érythermalgie, acrocyanose, engelures, ischémie digitale)"],[240,"Hypoglycémie chez l'adulte et l'enfant"],[241,"Goitre, nodules thyroïdiens et cancers thyroïdiens"],[242,"Hyperthyroïdie"],[243,"Hypothyroïdie"],[244,"Adénome hypophysaire"],[245,"Insuffisance surrénale chez l'adulte et l'enfant"],[246,"Gynécomastie"],[247,"Diabète sucré de types 1 et 2 de l'enfant et de l'adulte. Complications"],[248,"Prévention primaire par la nutrition chez l'adulte et chez l'enfant"],[249,"Modifications thérapeutiques du mode de vie (alimentation et activité physique) chez l'adulte et l'enfant"],[250,"Dénutrition chez l'adulte et l'enfant"],[251,"Amaigrissement à tous les âges"],[252,"Troubles nutritionnels chez le sujet âgé"],[253,"Obésité de l'enfant et de l'adulte (voir item 71)"],[254,"Besoins nutritionnels et grossesse"],[255,"Diabète gestationnel"],[256,"Aptitude au sport chez l'adulte et l'enfant ; besoins nutritionnels chez le sportif (voir item 80)"],[257,"Œdèmes des membres inférieurs localisés ou généralisés"],[258,"Élévation de la créatininémie"],[259,"Protéinurie et syndrome néphrotique de l'adulte et de l'enfant"],[260,"Hématurie"],[261,"Néphropathie glomérulaire"],[262,"Néphropathies interstitielles"],[263,"Néphropathies vasculaires"],[264,"Insuffisance rénale chronique chez l'adulte et l'enfant"],[265,"Lithiase urinaire"],[266,"Polykystose rénale"],[267,"Troubles de l'équilibre acido-basique et désordres hydro-électrolytiques"],[268,"Hypercalcémie"],[269,"Douleurs abdominales aiguës chez l'enfant et chez l'adulte"],[270,"Douleurs lombaires aiguës chez l'enfant et chez l'adulte"],[271,"Reflux gastro-œsophagien chez le nourrisson, chez l'enfant et chez l'adulte. Hernie hiatale"],[272,"Ulcère gastrique et duodénal. Gastrite"],[273,"Dysphagie"],[274,"Vomissements du nourrisson, de l'enfant et de l'adulte"],[275,"Splénomégalie"],[276,"Hépatomégalie et masse abdominale"],[277,"Lithiase biliaire et complications"],[278,"Ictère"],[279,"Cirrhose et complications"],[280,"Ascite"],[281,"Pancréatite chronique"],[282,"Maladies Inflammatoires Chroniques de l'Intestin (MICI) chez l'adulte"],[283,"Constipation chez l'enfant et l'adulte (avec le traitement)"],[284,"Colopathie fonctionnelle"],[285,"Diarrhée chronique chez l'adulte et l'enfant"],[286,"Diarrhée aiguë et déshydratation chez le nourrisson, l'enfant et l'adulte"],[287,"Diverticulose colique et diverticulite aiguë du sigmoïde"],[288,"Pathologie hémorroïdaire"],[289,"Hernie pariétale chez l'enfant et l'adulte"],[290,"Épidémiologie, facteurs de risque, prévention et dépistage des cancers"],[291,"Cancer : cancérogénèse, oncogénétique"],[292,"Diagnostic des cancers : signes d'appel et investigations para-cliniques ; caractérisation du stade ; pronostic"],[293,"Le médecin préleveur de cellules et/ou de tissus pour des examens d'Anatomie et Cytologie Pathologiques : connaître les principes de réalisation, transmission et utilisation des prélèvements à visée sanitaire et de recherche"],[294,"Traitement des cancers : principales modalités, classes thérapeutiques et leurs complications majeures. La décision thérapeutique pluridisciplinaire et l'information du malade"],[295,"Prise en charge et accompagnement d'un malade atteint de cancer à tous les stades de la maladie dont le stade de soins palliatifs en abordant les problématiques techniques, relationnelles, sociales et éthiques. Traitements symptomatiques. Modalités de surveillance"],[296,"Agranulocytose médicamenteuse : conduite à tenir"],[297,"Cancer de l'enfant : particularités épidémiologiques, diagnostiques et thérapeutiques"],[298,"Tumeurs de la cavité buccale, naso-sinusiennes et du cavum, et des voies aérodigestives supérieures"],[299,"Tumeurs intracrâniennes"],[300,"Tumeurs du col utérin, tumeur du corps utérin"],[301,"Tumeurs du colon et du rectum"],[302,"Tumeurs cutanées, épithéliales et mélaniques"],[303,"Tumeurs de l'estomac"],[304,"Tumeurs du foie, primitives et secondaires"],[305,"Tumeurs de l'œsophage"],[306,"Tumeurs de l'ovaire"],[307,"Tumeurs des os primitives et secondaires"],[308,"Tumeurs du pancréas"],[309,"Tumeurs du poumon, primitives et secondaires"],[310,"Tumeurs de la prostate"],[311,"Tumeurs du rein de l’adulte"],[312,"Tumeurs du sein"],[313,"Tumeurs du testicule"],[314,"Tumeurs vésicales"],[315,"Leucémies aiguës"],[316,"Syndromes myélodysplasiques"],[317,"Syndromes myéloprolifératifs"],[318,"Leucémies lymphoïdes chroniques"],[319,"Lymphomes malins"],[320,"Myélome multiple des os"],[321,"Principe du bon usage du médicament"],[322,"La décision thérapeutique personnalisée : bon usage dans des situations à risque"],[323,"Analyser et utiliser les résultats des études cliniques dans la perspective du bon usage - analyse critique, recherche clinique et niveaux de preuve (voir item 3)"],[324,"Education thérapeutique, observance et automédication"],[325,"Identification et gestion des risques liés aux médicaments et aux biomatériaux, risque iatrogène, erreur médicamenteuse (voir item 4 et item 5)"],[326,"Cadre réglementaire de la prescription thérapeutique et recommandations pour le bon usage"],[327,"Principes de la médecine intégrative, utilité et risques des interventions non médicamenteuses et des thérapies complémentaires"],[328,"Thérapeutiques non médicamenteuses et dispositifs médicaux"],[329,"Transfusion sanguine et produits dérivés du sang : indications, complications. Hémovigilance"],[330,"Prescription et surveillance des classes de médicaments les plus courantes chez l'adulte et chez l'enfant, hors anti-infectieux (voir item 174). Connaitre les grands principes thérapeutiques"],[331,"Arrêt cardio-circulatoire"],[332,"État de choc. Principales étiologies : hypovolémique, septique (voir item 158), cardiogénique, anaphylactique"],[333,"Situations sanitaires exceptionnelles"],[334,"Prise en charge immédiate pré-hospitalière et à l'arrivée à l'hôpital, évaluation des complications chez : un brûlé, un traumatisé sévère, un traumatisé thoracique, un traumatisé abdominal, un traumatisé des membres et/ou du bassin, un traumatisé du rachis ou vertébro-médullaire, un traumatisé crânien ou crânio-encéphalique"],[335,"Orientation diagnostique et conduite à tenir devant un traumatisme maxillo-facial et oculaire"],[336,"Coma non traumatique chez l'adulte et chez l'enfant"],[337,"Principales intoxications aiguës"],[338,"Œdème de Quincke et anaphylaxie"],[339,"Syndromes coronariens aigus"],[340,"Accidents vasculaires cérébraux"],[341,"Hémorragie méningée"],[342,"Malaise, perte de connaissance, crise convulsive chez l'adulte (voir item 105)"],[343,"État confusionnel et trouble de conscience chez l'adulte et chez l'enfant"],[344,"Prise en charge d'une patiente atteinte de pré-éclampsie"],[345,"Malaise grave du nourrisson et mort inattendue du nourrisson"],[346,"Convulsions chez le nourrisson et chez l'enfant"],[347,"Rétention aiguë d'urine"],[348,"Insuffisance rénale aiguë - Anurie"],[349,"Infection aiguë des parties molles (abcès, panaris, phlegmon des gaines)"],[350,"Grosse jambe rouge aiguë"],[351,"Agitation et délire aiguë"],[352,"Crise d'angoisse aiguë et attaque de panique"],[353,"Risque et conduite suicidaires chez l'enfant, l'adolescent et l'adulte : identification et prise en charge"],[354,"Syndrome occlusif de l'enfant et de l'adulte"],[355,"Hémorragie digestive"],[356,"Appendicite de l'enfant et de l'adulte"],[357,"Péritonite aiguë chez l'enfant et chez l'adulte"],[358,"Pancréatite aiguë"],[359,"Détresse et insuffisance respiratoire aigüe du nourrisson, de l'enfant et de l'adulte"],[360,"Pneumothorax"],[361,"Lésions péri-articulaires et ligamentaires du genou, de la cheville et de l'épaule"],[362,"Prothèses et ostéosynthèses"],[363,"Fractures fréquentes de l'adulte et du sujet âgé"],[364,"Fractures chez l'enfant : particularités épidémiologiques, diagnostiques et thérapeutiques"],[365,"Surveillance d'un malade sous plâtre/résine, diagnostiquer une complication"],[366,"Exposition accidentelle aux liquides biologiques : conduite à tenir"],[367,"Impact de l’environnement sur la santé"]];
+
+/* ================= Complétion des items ================= */
+const norm = x => x.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[’‘]/g, "'").replace(/œ/g, "oe").replace(/\s+/g, " ").trim();
+const EDN_IDX = EDN.map(([n, t]) => { const nt = norm(t); return { n, t, text: `${n} – ${t}`, nt, words: nt.split(/[^a-z0-9]+/).filter(Boolean) }; });
+let acSel = 0, acItems = [];
+
+function suggest(raw) {
+  let q = norm(raw).replace(/^(items?|n°|no|numero)\s*/, "");
+  if (!q) return [];
+  const out = [], seen = new Set();
+  const add = x => { if (!seen.has(x.text)) { seen.add(x.text); out.push(x); } };
+  // 1) Items déjà saisis (texte libre) qui commencent comme la saisie
+  const past = new Set();
+  for (const k of Object.keys(state.items)) for (const it of state.items[k]) past.add(it.text);
+  const byText = new Map(EDN_IDX.map(x => [x.text, x]));
+  for (const t of past) if (norm(t).startsWith(q) && norm(t) !== q) add(byText.get(t) || { text: t, n: "", t });
+  // 2) Numéro
+  const m = q.match(/^(\d{1,3})(?:\s*[-–—:.]?\s*(.*))?$/);
+  if (m) {
+    const num = m[1], rest = m[2] || "";
+    if (!rest) {
+      const exact = EDN_IDX.find(x => String(x.n) === num);
+      if (exact) add(exact);
+      for (const x of EDN_IDX) if (String(x.n).startsWith(num)) add(x);
+    } else {
+      const x = EDN_IDX.find(x => String(x.n) === num);
+      if (x && x.nt.includes(rest)) add(x);
+    }
+  } else if (q.length >= 2) {
+    // 3) Titre : commence par → tous les mots présents
+    for (const x of EDN_IDX) if (x.nt.startsWith(q)) add(x);
+    const toks = q.split(" ").filter(Boolean);
+    for (const x of EDN_IDX) if (toks.every(tk => x.words.some(w => w.startsWith(tk)))) add(x);
+  }
+  return out.filter(x => norm(x.text) !== norm(raw)).slice(0, 5);
+}
+
+const acInput = document.getElementById("itemInput"), acList = document.getElementById("acList"), acGhost = document.getElementById("acGhost");
+function acRender() {
+  const v = acInput.value;
+  acItems = suggest(v);
+  if (acSel >= acItems.length) acSel = 0;
+  // texte fantôme : seulement si la première suggestion prolonge exactement la saisie
+  const first = acItems[acSel];
+  if (first && v && first.text.toLowerCase().startsWith(v.toLowerCase()) && document.activeElement === acInput)
+    acGhost.innerHTML = `<span class="typed">${esc(v)}</span>${esc(first.text.slice(v.length))}`;
+  else acGhost.textContent = "";
+  acList.innerHTML = acItems.map((x, i) =>
+    `<li class="${i === acSel ? "sel" : ""}" data-i="${i}">${x.n ? `<span class="n">${x.n}</span>` : ""}<span class="t">${esc(x.n ? x.t : x.text)}</span><span class="kbd">Tab</span></li>`).join("");
+  acList.classList.toggle("open", acItems.length > 0 && document.activeElement === acInput);
+}
+function acAccept(i = acSel) {
+  const x = acItems[i]; if (!x) return false;
+  acInput.value = x.text; acSel = 0; acRender();
+  acInput.setSelectionRange(acInput.value.length, acInput.value.length);
+  return true;
+}
+acInput.addEventListener("input", () => { acSel = 0; acRender(); });
+acInput.addEventListener("focus", acRender);
+acInput.addEventListener("blur", () => { acList.classList.remove("open"); acGhost.textContent = ""; });
+acInput.addEventListener("keydown", e => {
+  if (e.key === "Tab" && !e.shiftKey && acItems.length) { e.preventDefault(); acAccept(); }
+  else if (e.key === "ArrowRight" && acInput.selectionStart === acInput.value.length && acGhost.textContent) { e.preventDefault(); acAccept(); }
+  else if (e.key === "ArrowDown" && acItems.length) { e.preventDefault(); acSel = (acSel + 1) % acItems.length; acRender(); }
+  else if (e.key === "ArrowUp" && acItems.length) { e.preventDefault(); acSel = (acSel - 1 + acItems.length) % acItems.length; acRender(); }
+  else if (e.key === "Escape") { acList.classList.remove("open"); acGhost.textContent = ""; }
+});
+// toucher / clic sur une suggestion (mobile) : pointerdown pour garder le focus
+acList.addEventListener("pointerdown", e => {
+  const li = e.target.closest("li"); if (!li) return;
+  e.preventDefault(); acAccept(+li.dataset.i); acInput.focus();
+});
+document.getElementById("itemForm").addEventListener("submit", () => { acGhost.textContent = ""; acList.classList.remove("open"); });
+
+/* ================= Vue Journée / Liens ================= */
+let view = (() => { try { return localStorage.getItem(KEY + ".view") || "day"; } catch { return "day"; } })();
+function setView(v) {
+  view = v; try { localStorage.setItem(KEY + ".view", v); } catch {}
+  document.querySelectorAll(".vtoggle button").forEach(b => b.classList.toggle("active", b.dataset.view === v));
+  document.querySelectorAll(".a-day .view").forEach(el => el.classList.toggle("active", el.classList.contains("view-" + v)));
+}
+document.querySelectorAll(".vtoggle button").forEach(b => b.onclick = () => setView(b.dataset.view));
+
+const host = u => { try { return new URL(u).hostname; } catch { return ""; } };
+function renderLinks() {
+  document.getElementById("links").innerHTML = state.links.map((l, i) => `
+    <a class="tile" href="${esc(l.url)}" target="_blank" rel="noopener" title="${esc(l.name)}">
+      <span class="letter">${esc((l.name || "?")[0].toUpperCase())}</span>
+      <img src="${esc(l.icon || `https://www.google.com/s2/favicons?domain=${host(l.url)}&sz=128`)}" alt=""
+           onload="if (this.naturalWidth > 1) this.parentNode.classList.add('has-icon')" onerror="this.remove()">
+      <button class="x" data-dellink="${i}" title="Retirer">✕</button>
+    </a>`).join("") + `<button class="tile add" id="addLink" title="Ajouter un lien">+</button>`;
+}
+document.getElementById("links").addEventListener("click", e => {
+  const d = e.target.closest("[data-dellink]");
+  if (d) {
+    e.preventDefault(); e.stopPropagation();
+    const l = state.links[+d.dataset.dellink];
+    if (confirm(`Retirer « ${l.name} » ?`)) { state.links.splice(+d.dataset.dellink, 1); save(); renderLinks(); }
+    return;
+  }
+  if (e.target.closest("#addLink")) {
+    document.getElementById("linkForm").classList.add("open");
+    document.getElementById("linkName").focus();
+  }
+});
+document.getElementById("linkCancel").onclick = () => document.getElementById("linkForm").classList.remove("open");
+document.getElementById("linkForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const name = document.getElementById("linkName").value.trim();
+  let url = document.getElementById("linkUrl").value.trim();
+  if (!url) return;
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+  state.links.push({ name: name || host(url), url });
+  save(); renderLinks();
+  e.target.reset(); e.target.classList.remove("open");
+});
+
+
+/* ================= Heures de début / fin de journée ================= */
+const fmtH = h => { let hh = Math.floor(h), mm = Math.round((h - hh) * 60); if (mm === 60) { hh++; mm = 0; } return mm ? `${hh} h ${String(mm).padStart(2, "0")}` : `${hh} h`; };
+const parseH = str => {
+  const m = str.trim().toLowerCase().match(/^(\d{1,2})(?:\s*(?:h|:|\.)\s*(\d{1,2})?)?$/);
+  if (!m) return null;
+  const h = +m[1], mi = m[2] ? +m[2] : 0;
+  return (h > 24 || mi > 59 || (h === 24 && mi)) ? null : h + mi / 60;
+};
+function renderDayLabels() {
+  document.getElementById("lblStart").textContent = fmtH(state.day.start);
+  document.getElementById("lblEnd").textContent = fmtH(state.day.end);
+  document.getElementById("lblMid").textContent = fmtH((state.day.start + state.day.end) / 2);
+}
+document.querySelectorAll(".hrlbl").forEach(g => g.addEventListener("click", () => {
+  if (document.querySelector(".hrinput")) return;
+  const k = g.dataset.k, r = g.querySelector("text").getBoundingClientRect(), cur = state.day[k];
+  const inp = document.createElement("input");
+  inp.className = "hrinput"; inp.title = "Ex : 7, 7h30, 23:00";
+  const hh = Math.floor(cur), mm = Math.round((cur - hh) * 60);
+  inp.value = mm ? `${hh}:${String(mm).padStart(2, "0")}` : String(hh);
+  inp.style.left = Math.max(4, r.left + r.width / 2 - 31) + "px";
+  inp.style.top = Math.max(4, r.top + r.height / 2 - 14) + "px";
+  document.body.appendChild(inp); inp.focus(); inp.select();
+  let done = false;
+  const finish = ok => {
+    if (done) return; done = true;
+    if (ok) {
+      const v = parseH(inp.value);
+      if (v !== null) {
+        const ns = k === "start" ? v : state.day.start, ne = k === "end" ? v : state.day.end;
+        if (ne - ns >= 1) { state.day[k] = v; save(); renderDayLabels(); tickClock(); }
+      }
+    }
+    inp.remove();
+  };
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") finish(true); else if (e.key === "Escape") finish(false); });
+  inp.addEventListener("blur", () => finish(true));
+}));
+
+/* ================= Feuille « Important » ================= */
+const imp = state.imp, byId = id => document.getElementById(id);
+const sod = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const dayDiff = (a, b) => Math.round((sod(a) - sod(b)) / 864e5);      // a − b, en jours calendaires
+const pad2 = n => String(n).padStart(2, "0");
+const toLocalInput = ts => { const d = new Date(ts); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const hhmm = ts => new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function whenStr(ts) {
+  const n = dayDiff(new Date(), new Date(ts));
+  if (n === 0) return `auj. ${hhmm(ts)}`;
+  if (n === 1) return `hier ${hhmm(ts)}`;
+  return `${new Date(ts).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} ${hhmm(ts)}`;
+}
+
+/* --- Famileo (jusqu'à 2 dates) --- */
+let famEditing = -1;
+function renderFam() {
+  if (famEditing >= 0) return;
+  const w = byId("famWrap"), ds = imp.famDates, N = 2;
+  let h = "";
+  for (let i = 0; i < Math.min(ds.length + 1, N); i++) {
+    const v = ds[i], lab = i ? "Famileo · " + (i + 1) : "Famileo";
+    if (!v) { h += `<button class="fam-add" type="button" data-famadd="${i}">+ ${i ? "2ᵉ date" : "Date Famileo"}</button>`; continue; }
+    const [y, m, d] = v.split("-").map(Number), dt = new Date(y, m - 1, d), n = dayDiff(dt, new Date());
+    h += `<div class="pbox fam${n <= 3 ? " urgent" : ""}"><div class="lbl">${lab}</div><div class="fam-row">` +
+      `<button class="fam-date" type="button" data-famedit="${i}" title="Changer la date">${dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}</button>` +
+      `<span class="fam-count">${n > 0 ? "J-" + n : n === 0 ? "Jour J" : "J+" + (-n)}</span></div>` +
+      `<button class="xbtn fam-rm" type="button" data-famrm="${i}" title="Supprimer">✕</button></div>`;
+  }
+  w.innerHTML = h;
+}
+function famEdit(i, host) {
+  famEditing = i;
+  const inp = document.createElement("input"); inp.type = "date"; inp.value = imp.famDates[i] || "";
+  host.replaceWith(inp);
+  const done = () => { famEditing = -1; renderFam(); };
+  inp.addEventListener("change", () => { if (inp.value) { imp.famDates[i] = inp.value; save(); } done(); });
+  inp.addEventListener("blur", () => setTimeout(() => { if (famEditing >= 0) done(); }, 150));
+  inp.addEventListener("keydown", e => { if (e.key === "Escape") done(); });
+  inp.focus(); try { inp.showPicker(); } catch {}
+}
+byId("famWrap").addEventListener("click", e => {
+  const t = e.target.closest("[data-famedit],[data-famadd],[data-famrm]"); if (!t) return;
+  if (t.dataset.famrm != null) { imp.famDates.splice(+t.dataset.famrm, 1); save(); renderFam(); }
+  else famEdit(+(t.dataset.famedit ?? t.dataset.famadd), t);
+});
+
+/* --- Appels --- */
+let callEditing = false;
+const lastCall = who => imp.calls.filter(c => c.who === who).reduce((a, c) => (!a || c.ts > a.ts) ? c : a, null);
+const callsSorted = () => [...imp.calls].sort((a, b) => b.ts - a.ts);
+function renderPeople() {
+  byId("people").innerHTML = imp.people.map((name, i) => {
+    const last = lastCall(name), n = last ? dayDiff(new Date(), new Date(last.ts)) : null, done = n === 0;
+    return `<div class="person${done ? " ok" : ""}">
+      <button class="pbtn" type="button" data-call="${i}" aria-pressed="${done}" title="${last ? "Dernier appel : " + esc(whenStr(last.ts)) : "Pas encore d'appel"}">
+        <span class="nm">${esc(name)}</span><span class="jx${n !== null && n >= 7 ? " late" : ""}">${n === null ? "–" : "J" + n}</span></button>
+      <button class="xbtn prm" type="button" data-rmperson="${i}" title="Retirer ${esc(name)}">✕</button></div>`;
+  }).join("");
+}
+function renderEditLog() {
+  byId("editLog").innerHTML = callsSorted().slice(0, 60).map(c =>
+    `<li><span class="who" title="${esc(c.who)}">${esc(c.who)}</span><input type="datetime-local" value="${toLocalInput(c.ts)}" data-calltime="${c.id}"><button class="xbtn" type="button" data-rmcall="${c.id}" title="Supprimer cet appel">✕</button></li>`
+  ).join("") || `<li class="none">Aucun appel à modifier.</li>`;
+}
+function renderCalls() {
+  renderPeople();
+  const last3 = callsSorted().slice(0, 3);
+  byId("callLog").innerHTML = last3.length
+    ? last3.map(c => `<li><span>${esc(c.who)}</span><span>${esc(whenStr(c.ts))}</span></li>`).join("")
+    : `<li>Aucun appel enregistré</li>`;
+  if (callEditing) renderEditLog();
+}
+function setCallEditing(v) {
+  callEditing = v;
+  byId("call").classList.toggle("editing", v);
+  byId("callPen").textContent = v ? "✓" : "✎";
+  if (v) renderEditLog();
+}
+byId("callTitle").addEventListener("click", () => setCallEditing(!callEditing));
+byId("callTitle").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCallEditing(!callEditing); } });
+byId("personForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const inp = byId("personInput"); let name = inp.value.trim();
+  if (!name) return;
+  name = name[0].toUpperCase() + name.slice(1);
+  if (!imp.people.some(p => p.toLowerCase() === name.toLowerCase())) { imp.people.push(name); save(); renderCalls(); }
+  inp.value = "";
+});
+
+/* --- À faire --- */
+function renderPTodo() {
+  byId("ptodo").innerHTML = imp.todos.map(t =>
+    `<li class="${t.done ? "ok" : ""}" data-tid="${t.id}"><span class="grip" title="Glisser pour réordonner">⠿</span><input class="pcheck" type="checkbox" ${t.done ? "checked" : ""} data-ptoggle="${t.id}" aria-label="Fait"><span class="txt" title="Double-clic pour modifier">${esc(t.text)}</span><button class="xbtn" type="button" data-ptedit="${t.id}" title="Modifier">✎</button><button class="xbtn" type="button" data-ptdel="${t.id}" title="Supprimer">✕</button></li>`
+  ).join("");
+  byId("ptodoClear").hidden = !imp.todos.some(t => t.done);
+}
+byId("ptodoForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const inp = byId("ptodoInput"), text = inp.value.trim();
+  if (!text) return;
+  imp.todos.push({ id: uid(), text, done: false }); inp.value = ""; save(); renderPTodo();
+});
+
+/* --- Réduire / afficher la feuille (œil) --- */
+const THEMES = { auto: ["🌓", "Thème : automatique (système)"], dark: ["🌙", "Thème : nuit"], light: ["☀️", "Thème : jour"] };
+function applyTheme() {
+  const t = state.theme;
+  if (t === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
+  const b = byId("themeBtn"); b.textContent = THEMES[t][0]; b.title = THEMES[t][1] + " — cliquer pour changer";
+}
+byId("themeBtn").addEventListener("click", () => { state.theme = { auto: "dark", dark: "light", light: "auto" }[state.theme]; save(); applyTheme(); });
+function applyCollapsed() {
+  const c = !!imp.collapsed;
+  byId("paper").classList.toggle("collapsed", c);
+  document.querySelector(".app").classList.toggle("imp-off", c);
+  byId("eyeBtn").setAttribute("aria-expanded", String(!c));
+  byId("eyeBtn").title = c ? "Afficher" : "Réduire";
+}
+byId("eyeBtn").addEventListener("click", () => { imp.collapsed = !imp.collapsed; save(); applyCollapsed(); });
+
+/* --- Clics sur la feuille --- */
+/* --- Modifier le texte d'une tâche (double-clic ou ✎) --- */
+function editTodo(id) {
+  const t = imp.todos.find(x => x.id === id), li = byId("ptodo").querySelector(`li[data-tid="${id}"]`); if (!t || !li) return;
+  const span = li.querySelector(".txt"), inp = document.createElement("input");
+  inp.type = "text"; inp.className = "tedit"; inp.value = t.text; inp.maxLength = 300;
+  span.replaceWith(inp); inp.focus(); inp.select();
+  let done = false;
+  const finish = ok => {
+    if (done) return; done = true;
+    const v = inp.value.trim(); if (ok && v && v !== t.text) { t.text = v; save(); }
+    renderPTodo();
+  };
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") finish(true); else if (e.key === "Escape") finish(false); });
+  inp.addEventListener("blur", () => finish(true));
+}
+byId("ptodo").addEventListener("dblclick", e => { const li = e.target.closest("li"); if (li && e.target.closest(".txt")) editTodo(li.dataset.tid); });
+byId("ptodo").addEventListener("click", e => { const b = e.target.closest("[data-ptedit]"); if (b) { e.stopPropagation(); editTodo(b.dataset.ptedit); } });
+
+/* --- Glisser-déposer des tâches « Important » --- */
+byId("ptodo").addEventListener("pointerdown", e => {
+  const li = e.target.closest("li"); if (!li || e.button > 0 || e.target.closest(".pcheck,.xbtn,input")) return;
+  if (e.pointerType === "touch" && !e.target.closest(".grip")) return;   // au doigt : on attrape la poignée
+  const list = byId("ptodo"), from = [...list.children].indexOf(li), x0 = e.clientX, y0 = e.clientY;
+  let on = false, to = from;
+  const clear = () => [...list.children].forEach(o => o.classList.remove("drop-before", "drop-after"));
+  const move = ev => {
+    const dy = ev.clientY - y0;
+    if (!on && Math.abs(dy) + Math.abs(ev.clientX - x0) > 7) { on = true; li.classList.add("dragging"); try { li.setPointerCapture(e.pointerId); } catch {} }
+    if (!on) return;
+    ev.preventDefault();
+    li.style.transform = `translateY(${dy}px)`;
+    const kids = [...list.children]; clear(); to = kids.length - 1;
+    for (let i = 0; i < kids.length; i++) {
+      if (i === from) continue;
+      const r = kids[i].getBoundingClientRect();
+      if (ev.clientY < r.top + r.height / 2) { to = i > from ? i - 1 : i; kids[i].classList.add("drop-before"); break; }
+      if (i === kids.length - 1 || (i === kids.length - 2 && from === kids.length - 1)) { to = i < from ? i + 1 : i; kids[i].classList.add("drop-after"); }
+    }
+  };
+  const up = () => {
+    li.removeEventListener("pointermove", move); li.removeEventListener("pointerup", up); li.removeEventListener("pointercancel", up);
+    if (!on) return;
+    dragSuppress = true; setTimeout(() => dragSuppress = false, 0);
+    if (to !== from) { const [t] = imp.todos.splice(from, 1); imp.todos.splice(to, 0, t); save(); }
+    renderPTodo();
+  };
+  li.addEventListener("pointermove", move); li.addEventListener("pointerup", up); li.addEventListener("pointercancel", up);
+});
+
+/* --- Glisser-déposer des prénoms --- */
+let dragSuppress = false;
+byId("people").addEventListener("pointerdown", e => {
+  const el = e.target.closest(".person"); if (!el || e.target.closest(".prm") || e.button > 0) return;
+  const from = [...byId("people").children].indexOf(el), x0 = e.clientX, y0 = e.clientY;
+  let on = false, target = from;
+  const others = () => [...byId("people").children];
+  const move = ev => {
+    const dx = ev.clientX - x0, dy = ev.clientY - y0;
+    if (!on && Math.hypot(dx, dy) > 7) { on = true; el.classList.add("dragging"); try { el.setPointerCapture(e.pointerId); } catch {} }
+    if (!on) return;
+    ev.preventDefault();
+    el.style.transform = `translate(${dx}px,${dy}px) scale(1.04)`;
+    let best = from, bd = 1e9;
+    others().forEach((o, i) => { const r = o.getBoundingClientRect(), d = Math.hypot(ev.clientX - (r.left + r.width / 2), ev.clientY - (r.top + r.height / 2)); if (d < bd) { bd = d; best = i; } });
+    target = best;
+    others().forEach((o, i) => o.classList.toggle("drop", i === target && i !== from));
+  };
+  const up = () => {
+    el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up);
+    if (!on) return;
+    dragSuppress = true; setTimeout(() => dragSuppress = false, 0);
+    if (target !== from) { const [n] = imp.people.splice(from, 1); imp.people.splice(target, 0, n); save(); }
+    renderPeople();
+  };
+  el.addEventListener("pointermove", move); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+});
+byId("paper").addEventListener("click", e => { if (dragSuppress) { e.stopPropagation(); return; }
+
+  const t = e.target, q = sel => t.closest(sel);
+  let el;
+  if ((el = q("[data-call]"))) {
+    const name = imp.people[+el.dataset.call], last = lastCall(name);
+    if (last && dayDiff(new Date(), new Date(last.ts)) === 0) imp.calls = imp.calls.filter(c => c.id !== last.id);   // re-clic le jour même = décocher
+    else imp.calls.push({ id: uid(), who: name, ts: Date.now() });
+    save(); renderCalls();
+  } else if ((el = q("[data-rmperson]"))) {
+    imp.people.splice(+el.dataset.rmperson, 1); save(); renderCalls();
+  } else if ((el = q("[data-rmcall]"))) {
+    imp.calls = imp.calls.filter(c => c.id !== el.dataset.rmcall); save(); renderCalls();
+  } else if ((el = q("[data-ptdel]"))) {
+    imp.todos = imp.todos.filter(x => x.id !== el.dataset.ptdel); save(); renderPTodo();
+  } else if (t.id === "ptodoClear") {
+    imp.todos = imp.todos.filter(x => !x.done); save(); renderPTodo();
+  }
+});
+byId("paper").addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset.ptoggle) { const x = imp.todos.find(x => x.id === t.dataset.ptoggle); if (x) { x.done = t.checked; save(); renderPTodo(); } }
+  else if (t.dataset.calltime) {
+    const c = imp.calls.find(c => c.id === t.dataset.calltime), ts = new Date(t.value).getTime();
+    if (c && !isNaN(ts)) { c.ts = ts; save(); }
+    renderCalls();
+  }
+});
+
+/* ================= Synchronisation cloud (Supabase) ================= */
+/* Toutes les données de la page vivent dans une ligne « state » de la base ; les chiffres Anki dans une ligne « anki ».
+   Fusion à 3 voies clé par clé : ce que cet appareil a modifié depuis la dernière synchro gagne, le reste vient du cloud. */
+async function rpc(fn, args = {}) {
+  const key = syncCfg.key, headers = { apikey: key, "Content-Type": "application/json" };
+  if (/^eyJ/.test(key)) headers.Authorization = "Bearer " + key;
+  const r = await fetch(syncCfg.url.replace(/\/+$/, "") + "/rest/v1/rpc/" + fn, {
+    method: "POST", headers, cache: "no-store", body: JSON.stringify({ p_secret: syncCfg.secret, ...args })
+  });
+  const txt = await r.text();
+  if (!r.ok) {
+    let m = txt; try { m = JSON.parse(txt).message || txt; } catch {}
+    throw new Error(/conflict/i.test(m) ? "conflict" : /secret/i.test(m) ? "code secret incorrect" : r.status === 404 ? "fonctions absentes (script SQL lancé ?)" : r.status === 401 ? "clé publique incorrecte" : m);
+  }
+  return txt ? JSON.parse(txt) : null;
+}
+
+const DEEP = new Set(["imp", "workMs", "pomoDone", "items", "goals", "pomo", "day"]);
+const SEP = "\u0001";
+function flat(s) {
+  const o = {};
+  for (const [k, v] of Object.entries(s || {})) {
+    if (DEEP.has(k) && v && typeof v === "object" && !Array.isArray(v))
+      for (const [k2, v2] of Object.entries(v)) { if (v2 !== undefined) o[k + SEP + k2] = JSON.stringify(v2); }
+    else if (v !== undefined) o[k] = JSON.stringify(v);
+  }
+  return o;
+}
+function unflat(f) {
+  const s = {};
+  for (const [p, j] of Object.entries(f)) {
+    const v = JSON.parse(j), i = p.indexOf(SEP);
+    if (i < 0) s[p] = v; else (s[p.slice(0, i)] ||= {})[p.slice(i + 1)] = v;
+  }
+  return s;
+}
+function merge3(L, B, R) {
+  const out = {};
+  for (const p of new Set([...Object.keys(L), ...Object.keys(B), ...Object.keys(R)])) {
+    const v = L[p] !== B[p] ? L[p] : R[p];
+    if (v !== undefined) out[p] = v;
+  }
+  return out;
+}
+function sameFlat(a, b) {
+  const ka = Object.keys(a);
+  return ka.length === Object.keys(b).length && ka.every(k => a[k] === b[k]);
+}
+const hasData = s => !!s && (Object.values(s.items || {}).some(a => a && a.length) || (s.anki || []).length || (s.search || []).length ||
+  ((s.imp || {}).todos || []).length || ((s.imp || {}).calls || []).length);
+
+/* remplace le contenu de `state` sans casser les références (imp) */
+function applyState(obj) {
+  const keepImp = state.imp;
+  for (const k of Object.keys(state)) delete state[k];
+  Object.assign(state, structuredClone(defaults), structuredClone(obj));
+  for (const k of Object.keys(keepImp)) delete keepImp[k];
+  Object.assign(keepImp, state.imp || {});
+  state.imp = keepImp;
+  normalize();
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
+  renderAll();
+}
+function renderAll() {
+  renderLinks(); renderDayLabels(); renderFam(); renderCalls(); renderPTodo(); applyCollapsed(); applyTheme();
+  renderLists(); tickClock(); fillSettings();
+  if (!pomo.running) pomo.remaining = Math.min(pomo.remaining, modeLen(pomo.mode));
+  renderPomo();
+  if (lastStats) renderAnki(...lastStats);
+}
+
+function scheduleSync(ms = 1500) {
+  if (!syncCfg) return;
+  clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, ms);
+}
+async function syncNow() {
+  if (!syncCfg) return;
+  if (syncBusy) { syncAgain = true; return; }
+  syncBusy = true; clearTimeout(syncTimer);
+  try {
+    const all = await rpc("dash_get") || {};
+    cloudAnki = all.anki ? all.anki.data : null;
+    const remote = all.state ? all.state.data : null;
+    const baseStr = localStorage.getItem(SYNC_BASE_KEY);
+    const L = flat(state), R = remote ? flat(remote) : null;
+    let M;
+    if (!R) M = L;                                         // cloud vide : cet appareil l'initialise
+    else if (baseStr === null) {                           // 1re synchro de cet appareil : le cloud fait foi…
+      M = R;
+      if (hasData(state) && !sameFlat(L, R) &&
+          !confirm("Le cloud contient déjà des données.\n\nOK : utiliser celles du cloud sur cet appareil.\nAnnuler : remplacer le cloud par les données de cet appareil."))
+        M = L;                                             // …sauf si on choisit de garder cet appareil
+    } else M = merge3(L, JSON.parse(baseStr), R);
+    if (!sameFlat(M, L)) applyState(unflat(M));
+    if (!R || !sameFlat(M, R)) {
+      try { await rpc("dash_put", { p_id: "state", p_data: unflat(M), p_rev: all.state ? all.state.rev : 0 }); }
+      catch (e) {
+        if (!/conflict/i.test(e.message)) throw e;
+        // un autre appareil a écrit entre-temps : on garde la base « locale vs cloud lu » et on refusionne
+        const B = baseStr === null ? (M === L ? {} : R) : JSON.parse(baseStr), nb = {};
+        for (const p of new Set([...Object.keys(B), ...Object.keys(R)])) { const v = L[p] !== B[p] ? B[p] : R[p]; if (v !== undefined) nb[p] = v; }
+        localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(nb));
+        syncAgain = true; return;
+      }
+    }
+    localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(M));
+    syncStatus = { s: "ok", msg: "", at: Date.now() };
+  } catch (e) {
+    syncStatus = { s: "err", msg: e.name === "TypeError" ? "réseau indisponible" : e.message };
+  } finally {
+    syncBusy = false;
+    renderSyncState(); renderAnkiFromCloud();
+    if (syncAgain) { syncAgain = false; scheduleSync(200); }
+  }
+}
+
+/* ---- Interface (réglages) ---- */
+function renderSyncState() {
+  const el = byId("syncState"); if (!el) return;
+  el.className = "syncstate " + (syncStatus.s === "ok" ? "ok" : syncStatus.s === "err" ? "err" : "");
+  el.textContent = !syncCfg ? "Non connectée" : syncStatus.s === "ok" ? "✓ Synchronisée · " + hm(syncStatus.at)
+    : syncStatus.s === "err" ? "✗ " + syncStatus.msg : "Connexion…";
+  byId("syncSave").textContent = syncCfg ? "Enregistrer" : "Connecter";
+}
+async function copyText(text, what) {
+  try { await navigator.clipboard.writeText(text); alert(what + " copié dans le presse-papiers."); }
+  catch { prompt(what + " (à copier) :", text); }
+}
+function initSyncUI() {
+  const u = byId("syncUrl"), k = byId("syncKey"), s = byId("syncSecret");
+  if (syncCfg) { u.value = syncCfg.url; k.value = syncCfg.key; s.value = syncCfg.secret; }
+  renderSyncState();
+  byId("syncSave").onclick = () => {
+    const url = u.value.trim(), key = k.value.trim(), secret = s.value.trim();
+    if (!/^https:\/\/.+/.test(url) || !key || !secret) { alert("Remplis l'URL (https://…), la clé publique et le code secret."); return; }
+    const changed = !syncCfg || syncCfg.url !== url || syncCfg.secret !== secret;
+    syncCfg = { url, key, secret };
+    try { localStorage.setItem(SYNC_CFG_KEY, JSON.stringify(syncCfg)); if (changed) localStorage.removeItem(SYNC_BASE_KEY); } catch {}
+    syncStatus = { s: "wait" }; renderSyncState(); refresh();
+  };
+  byId("syncOff").onclick = () => {
+    if (!syncCfg || !confirm("Déconnecter cet appareil du cloud ? (les données restent sur cet appareil et dans le cloud)")) return;
+    syncCfg = null; try { localStorage.removeItem(SYNC_CFG_KEY); localStorage.removeItem(SYNC_BASE_KEY); } catch {}
+    syncStatus = { s: "off" }; renderSyncState(); refresh();
+  };
+  byId("syncLink").onclick = () => {
+    if (!syncCfg) { alert("Connecte d'abord cet appareil."); return; }
+    if (location.protocol === "file:") { alert("Ouvre la version en ligne du site pour copier son lien de connexion."); return; }
+    copyText(location.origin + location.pathname + "#cfg=" + encodeURIComponent(btoa(JSON.stringify(syncCfg))), "Lien de connexion");
+  };
+  byId("syncAddon").onclick = () => {
+    if (!syncCfg) { alert("Connecte d'abord cet appareil."); return; }
+    copyText(JSON.stringify({ supabase_url: syncCfg.url, supabase_key: syncCfg.key, sync_secret: syncCfg.secret }, null, 2), "Config du module Anki");
+  };
+  byId("pushAll").onclick = async () => {
+    if (!syncCfg) { alert("Connecte d'abord cet appareil."); return; }
+    if (!confirm("Remplacer les données du cloud par celles de cet appareil ?")) return;
+    try { await rpc("dash_put", { p_id: "state", p_data: state }); localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(flat(state))); syncStatus = { s: "ok", at: Date.now() }; }
+    catch (e) { syncStatus = { s: "err", msg: e.message }; }
+    renderSyncState();
+  };
+  byId("exportBtn").onclick = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 1)], { type: "application/json" }));
+    a.download = `anki-dashboard-${dayKey()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  const importText = txt => {
+    let obj; try { obj = JSON.parse(txt); if (typeof obj === "string") obj = JSON.parse(obj); } catch { alert("Ce texte n'est pas un export valide."); return; }
+    if (!obj || typeof obj !== "object" || !("goals" in obj || "imp" in obj || "items" in obj)) { alert("Ce JSON ne ressemble pas à un export du dashboard."); return; }
+    if (!confirm("Remplacer toutes les données de cet appareil (et du cloud) par cet import ?")) return;
+    applyState(obj); save();
+  };
+  byId("importBtn").onclick = () => {
+    const t = prompt("Colle ici le texte exporté.\n(Laisse vide et valide pour choisir un fichier .json)");
+    if (t === null) return;
+    if (t.trim()) importText(t.trim()); else byId("importFile").click();
+  };
+  byId("importFile").onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    f.text().then(importText); e.target.value = "";
+  };
+}
+/* lien de connexion : …/#cfg=… (lu une seule fois puis retiré de l'adresse) */
+(() => {
+  const m = location.hash.match(/cfg=([^&]+)/); if (!m) return;
+  try {
+    const c = JSON.parse(atob(decodeURIComponent(m[1])));
+    if (c.url && c.key && c.secret) {
+      const changed = !syncCfg || syncCfg.url !== c.url || syncCfg.secret !== c.secret;
+      syncCfg = { url: c.url, key: c.key, secret: c.secret };
+      localStorage.setItem(SYNC_CFG_KEY, JSON.stringify(syncCfg));
+      if (changed) localStorage.removeItem(SYNC_BASE_KEY);
+    }
+  } catch {}
+  history.replaceState(null, "", location.pathname + location.search);
+})();
+
+/* ================= Lancement ================= */
+renderLinks(); setView(view);
+renderDayLabels(); renderFam(); renderCalls(); renderPTodo(); applyCollapsed(); applyTheme();
+setInterval(() => { renderFam(); renderPeople(); }, 60000);
+renderLists(); tickClock(); renderPomo(); refresh(); locateMe();
+setInterval(tickClock, 1000);
+setInterval(tickPomo, 250);
+setInterval(() => { if (!document.hidden) refresh(); }, 30000);
+initSyncUI(); scheduleSync(300);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderLists(); renderFam(); renderPeople(); refresh(); } });
+</script>
+</body>
+</html>
