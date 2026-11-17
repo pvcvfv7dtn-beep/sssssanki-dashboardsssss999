@@ -456,6 +456,13 @@
   .syncqr { margin: 4px 0 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; text-align: center; }
   .syncqr svg { width: 260px; max-width: 100%; height: auto; display: block; margin: 0 auto 8px; border-radius: 6px; }
   .syncqr .synchelp { margin: 0 0 6px; }
+  .scanbox { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px; }
+  .scanbox[hidden] { display: none; }
+  .scanbox .scanview { position: relative; width: min(82vw, 360px); aspect-ratio: 1; border-radius: 18px; overflow: hidden; background: #000; }
+  .scanbox video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .scanbox .scanview::after { content: ""; position: absolute; inset: 14%; border: 3px solid rgba(255,255,255,.85); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0,0,0,.25); }
+  .scanbox p { color: #fff; font-size: 14px; text-align: center; max-width: 340px; margin: 0; line-height: 1.4; }
+  .scanbox button { background: #fff; color: #111; border: 0; border-radius: 999px; padding: 9px 22px; font: inherit; font-size: 14px; cursor: pointer; }
   .modal label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; gap: 12px; }
   .modal input[type=number] { flex: 0 0 80px; text-align: right; }
   .modal .sub:first-of-type { margin-top: 0; }
@@ -655,7 +662,8 @@
     <label>Pause longue <input type="number" data-set="pomo.long" min="1"></label>
     <label>Pause longue tous les… <input type="number" data-set="pomo.every" min="2"></label>
     <div class="sub">Synchronisation entre appareils</div>
-    <p class="synchelp">Réglée une fois par appareil. Sur un nouvel appareil, le plus simple : sur un appareil déjà connecté, touche « QR code de connexion » et scanne-le avec l'appareil photo du nouveau. Pour un autre navigateur du même ordinateur, utilise plutôt « Copier le lien de connexion ».</p>
+    <p class="synchelp">Réglée une fois par appareil. Sur un nouvel appareil, le plus simple : affiche le « QR code de connexion » sur un appareil déjà connecté, puis scanne-le depuis le nouveau avec le bouton 📷 ci-dessous (ou son appareil photo). Pour un autre navigateur du même ordinateur, utilise plutôt « Copier le lien de connexion ».</p>
+    <div class="syncrow"><button class="btn" id="syncScan" type="button">📷 Scanner un QR code de connexion</button></div>
     <label>URL Supabase <input type="url" id="syncUrl" placeholder="https://xxxx.supabase.co" autocomplete="off"></label>
     <label>Clé publique <input type="text" id="syncKey" placeholder="sb_publishable_… ou eyJ…" autocomplete="off" spellcheck="false"></label>
     <label>Code secret <input type="password" id="syncSecret" autocomplete="off"></label>
@@ -681,6 +689,11 @@
     <p class="synchelp" id="pushHelp">Une notification à la fin de chaque pomodoro et de chaque pause, même dashboard fermé. À activer sur chaque appareil.</p>
     <div class="syncrow"><button class="btn" id="pushOn" type="button">🔔 Activer sur cet appareil</button><button class="ghost" id="pushOff" type="button" hidden>Désactiver</button><span class="syncstate" id="pushState"></span></div>
   </div>
+</div>
+<div class="scanbox" id="scanBox" hidden>
+  <div class="scanview"><video id="scanVideo" playsinline muted autoplay></video></div>
+  <p id="scanMsg">Vise le QR code affiché sur l'appareil déjà connecté.</p>
+  <button type="button" id="scanCancel">Annuler</button>
 </div>
 
 <script>
@@ -1090,7 +1103,7 @@ const modal = document.getElementById("settings");
 document.querySelectorAll("[data-open]").forEach(b => b.onclick = () => modal.classList.add("open"));
 document.getElementById("closeSettings").onclick = () => modal.classList.remove("open");
 modal.addEventListener("click", e => { if (e.target === modal) modal.classList.remove("open"); });
-document.addEventListener("keydown", e => { if (e.key === "Escape") modal.classList.remove("open"); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { if (!byId("scanBox").hidden) stopScan(); else modal.classList.remove("open"); } });
 
 /* ================= Listes ================= */
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1842,6 +1855,8 @@ function initSyncUI() {
     clearTimeout(qrTimer); qrTimer = setTimeout(hideQR, 180000);
   };
   byId("syncQRHide").onclick = hideQR;
+  byId("syncScan").onclick = startScan;
+  byId("scanCancel").onclick = stopScan;
   document.querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", hideQR));
   byId("syncAddon").onclick = () => {
     if (!syncCfg) { alert("Connecte d'abord cet appareil."); return; }
@@ -2794,21 +2809,101 @@ function qrSVG(text) {
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${c + z} ${r + z}h1v1h-1z`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n + 2 * z} ${n + 2 * z}" shape-rendering="crispEdges" role="img" aria-label="QR code de connexion"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
 }
-(() => {
-  const m = location.hash.match(/cfg=([^&]+)/); if (!m) return;
+/* lit un lien de connexion (…#cfg=…) ; renvoie la config ou null. Format court (tableau) ou ancien format (objet). */
+function parseConnect(text) {
+  const m = String(text).match(/cfg=([^&\s]+)/); if (!m) return null;
   try {
     let b = decodeURIComponent(m[1]).replace(/-/g, "+").replace(/_/g, "/"); while (b.length % 4) b += "=";
     let c = JSON.parse(atob(b));
-    if (Array.isArray(c)) c = { url: c[0], key: c[1], secret: c[2] };   // format court (QR code) ; l'ancien format objet reste accepté
-    if (c.url && c.key && c.secret) {
-      const changed = !syncCfg || syncCfg.url !== c.url || syncCfg.secret !== c.secret;
-      syncCfg = { url: c.url, key: c.key, secret: c.secret };
-      localStorage.setItem(SYNC_CFG_KEY, JSON.stringify(syncCfg));
-      if (changed) localStorage.removeItem(SYNC_BASE_KEY);
-    }
-  } catch {}
+    if (Array.isArray(c)) c = { url: c[0], key: c[1], secret: c[2] };
+    return c && c.url && c.key && c.secret ? { url: c.url, key: c.key, secret: c.secret } : null;
+  } catch { return null; }
+}
+function adoptCfg(c) {
+  const changed = !syncCfg || syncCfg.url !== c.url || syncCfg.secret !== c.secret;
+  syncCfg = c;
+  try { localStorage.setItem(SYNC_CFG_KEY, JSON.stringify(syncCfg)); if (changed) localStorage.removeItem(SYNC_BASE_KEY); } catch {}
+}
+(() => {
+  if (!/cfg=/.test(location.hash)) return;
+  const c = parseConnect(location.hash); if (c) adoptCfg(c);
   history.replaceState(null, "", location.pathname + location.search);
 })();
+
+/* ================= Scanner un QR code de connexion (caméra du nouvel appareil) =================
+   BarcodeDetector quand le navigateur l'a (Chrome, Android), sinon jsqr.js, chargé à la demande (Safari, iPhone, Firefox). */
+let scanStream = null, scanLoop = 0, jsQRReady = null;
+function loadJsQR() {
+  if (window.jsQR) return Promise.resolve();
+  return jsQRReady ||= new Promise((ok, ko) => {
+    const sc = document.createElement("script"); sc.src = "jsqr.js";
+    sc.onload = ok; sc.onerror = () => { jsQRReady = null; ko(new Error("lecteur de QR code introuvable (connexion ?)")); };
+    document.head.appendChild(sc);
+  });
+}
+function stopScan() {
+  cancelAnimationFrame(scanLoop); scanLoop = 0;
+  if (scanStream) scanStream.getTracks().forEach(t => t.stop());
+  scanStream = null; byId("scanVideo").srcObject = null; byId("scanBox").hidden = true;
+}
+async function startScan() {
+  const msg = t => byId("scanMsg").textContent = t;
+  if (location.protocol === "file:" || !window.isSecureContext) { alert("La caméra ne marche que sur le site en ligne :\n" + SITE_URL); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert("Ce navigateur ne donne pas accès à la caméra. Utilise le lien de connexion à la place."); return; }
+  byId("scanBox").hidden = false; msg("Autorise l'accès à la caméra…");
+  let detector = null;
+  try {
+    if ("BarcodeDetector" in window && (await BarcodeDetector.getSupportedFormats()).includes("qr_code")) detector = new BarcodeDetector({ formats: ["qr_code"] });
+  } catch {}
+  try {
+    const [stream] = await Promise.all([
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }),
+      detector ? null : loadJsQR(),
+    ]);
+    if (byId("scanBox").hidden) { stream.getTracks().forEach(t => t.stop()); return; }   // annulé entre-temps
+    scanStream = stream;
+  } catch (e) {
+    stopScan();
+    alert(e.name === "NotAllowedError" ? "Accès à la caméra refusé. Autorise-le dans les réglages du navigateur (sur iPhone : Réglages › Safari › Appareil photo), puis réessaie."
+      : e.name === "NotFoundError" ? "Aucune caméra trouvée sur cet appareil." : "Caméra indisponible : " + e.message);
+    return;
+  }
+  const video = byId("scanVideo"); video.srcObject = scanStream;
+  try { await video.play(); } catch {}
+  msg("Vise le QR code affiché sur l'appareil déjà connecté.");
+  const cv = document.createElement("canvas"), ctx = cv.getContext("2d", { willReadFrequently: true });
+  let busy = false, wrongShown = 0;
+  const found = text => {
+    const c = parseConnect(text);
+    if (!c) { if (Date.now() - wrongShown > 2500) { wrongShown = Date.now(); msg("Ce QR code n'est pas un code de connexion du dashboard."); } return false; }
+    stopScan(); adoptCfg(c);
+    byId("syncUrl").value = c.url; byId("syncKey").value = c.key; byId("syncSecret").value = c.secret;
+    syncStatus = { s: "wait" }; renderSyncState(); refresh();
+    alert("Appareil connecté ✓ Tes données arrivent dans quelques secondes.");
+    return true;
+  };
+  const tick = async () => {
+    if (!scanStream) return;
+    if (!busy && video.readyState >= 2 && video.videoWidth) {
+      busy = true;
+      try {
+        if (detector) {
+          const codes = await detector.detect(video);
+          for (const code of codes) if (found(code.rawValue)) return;
+        } else {
+          const k = Math.min(1, 800 / Math.max(video.videoWidth, video.videoHeight));   // image réduite : plus rapide, assez net
+          cv.width = Math.round(video.videoWidth * k); cv.height = Math.round(video.videoHeight * k);
+          ctx.drawImage(video, 0, 0, cv.width, cv.height);
+          const r = window.jsQR(ctx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height, { inversionAttempts: "dontInvert" });
+          if (r && r.data && found(r.data)) return;
+        }
+      } catch {}
+      busy = false;
+    }
+    scanLoop = requestAnimationFrame(tick);
+  };
+  tick();
+}
 
 /* ================= Lancement ================= */
 renderLinks(); setView(view);
