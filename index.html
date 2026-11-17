@@ -1841,6 +1841,7 @@ function initSyncUI() {
   };
   const importText = txt => {
     let obj; try { obj = JSON.parse(txt); if (typeof obj === "string") obj = JSON.parse(obj); } catch { alert("Ce texte n'est pas un export valide."); return; }
+    if (obj && obj.state && obj.state.data && typeof obj.state.data === "object") obj = obj.state.data;   // sauvegarde automatique du Mac (copie brute de Supabase)
     if (!obj || typeof obj !== "object" || !("goals" in obj || "imp" in obj || "items" in obj)) { alert("Ce JSON ne ressemble pas à un export du dashboard."); return; }
     if (!confirm("Remplacer toutes les données de cet appareil (et du cloud) par cet import ?")) return;
     applyState(obj); save();
