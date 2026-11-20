@@ -55,7 +55,6 @@
   .a-pomo { grid-area: pomo; } .a-anki { grid-area: anki; } .a-day { grid-area: day; }
   .a-items { grid-area: items; } .a-lists { grid-area: lists; } .a-imp { grid-area: imp; align-self: start; justify-self: start; width: min(100%, 340px); }
   .app.imp-off .a-imp { align-self: end; }
-  @media (min-width: 901px) and (min-aspect-ratio: 4/3) { .app.imp-off { grid-template-rows: calc((100% - 28px) * 0.29) fit-content(calc((100% - 28px) * 0.70)) minmax(0, 1fr); } }
   /* Les deux cases du bas s'alignent sur la plus remplie, plafonnées à l'espace dispo */
 
   /* Version mobile / fenêtre étroite : tout s'empile */
@@ -186,9 +185,11 @@
   .fam-date { font: 600 16px var(--sans); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; border-bottom: 1px dashed transparent; }
   .fam-date:hover { border-bottom-color: var(--ink2); }
   .famwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: stretch; }
-  .famwrap .fam { min-width: 0; padding: 9px 11px; }
-  .famwrap .fam-date { font-size: 13.5px; white-space: nowrap; }
-  .famwrap .fam-count { font-size: 17px; }
+  .famwrap .fam { min-width: 0; padding: 5px 11px 6px; }   /* cadres Famileo moins hauts */
+  .famwrap .fam .lbl { margin-bottom: 1px; }
+  .famwrap .fam-row { align-items: center; }
+  .famwrap .fam-date { font-size: 13.5px; line-height: 1.2; white-space: nowrap; }
+  .famwrap .fam-count { font-size: 16px; line-height: 1.2; }
   .fam-add { font-size: 11px; line-height: 1.2; }
   .fam .fam-rm { position: absolute; top: 6px; right: 8px; opacity: 0; transition: opacity .15s; z-index: 2; }
   .fam:hover .fam-rm, .fam:focus-within .fam-rm { opacity: 1; }
