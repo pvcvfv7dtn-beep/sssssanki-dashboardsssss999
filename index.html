@@ -444,6 +444,40 @@
   .seg .n { font-weight: 500; color: var(--muted); margin-left: 4px; }
   .foot { display: flex; justify-content: flex-end; padding-top: 6px; }
 
+  /* ---------- Liens de cours (3e onglet) ---------- */
+  form.cform { display: flex; gap: 6px; margin-bottom: 8px; }
+  form.cform #cName { flex: 0 1 40%; }
+  ul.clist { -webkit-touch-callout: none; }
+  ul.clist li { position: relative; align-items: center; gap: 8px; -webkit-user-select: none; user-select: none; }
+  ul.clist li.clink { cursor: pointer; padding: 7px 2px; }
+  ul.clist li.clink.ingroup { padding-left: 14px; }
+  ul.clist li.cgroup { cursor: pointer; padding: 14px 2px 6px; }
+  ul.clist li.cgroup:first-child { padding-top: 3px; }
+  .clist .chev { flex: none; width: 12px; font-size: 10px; color: var(--muted); text-align: center; transition: transform .15s; }
+  .clist li.closed .chev { transform: rotate(-90deg); }
+  .clist .gname { flex: 1; min-width: 0; font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .clist li.cgroup:hover .gname { color: var(--text); }
+  .clist .gcount { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .clist .fav { position: relative; flex: none; width: 20px; height: 20px; border-radius: 6px; background: var(--track); display: grid; place-items: center; overflow: hidden; }
+  .clist .fav span { font-size: 10px; font-weight: 700; color: var(--accent); }
+  .clist .fav img { position: absolute; width: 14px; height: 14px; opacity: 0; }
+  .clist .fav.has-icon img { opacity: 1; } .clist .fav.has-icon span { opacity: 0; }
+  .clist a.cname { flex: 1; min-width: 0; color: var(--text); text-decoration: none; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .clist li.clink:hover a.cname { color: var(--accent); }
+  .clist .chost { flex: 0 1 auto; max-width: 38%; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .clist .grip { flex: none; width: 10px; margin-left: -4px; font-size: 11px; letter-spacing: -2px; color: var(--muted); cursor: grab; opacity: 0; touch-action: none; transition: opacity .15s; }
+  .clist li:hover .grip { opacity: .55; }
+  .clist .cadd { font-size: 15px; line-height: 1; opacity: 0; transition: opacity .15s; }
+  .clist li:hover .cadd { opacity: 1; }
+  @media (hover: none) { .clist .grip { opacity: .4; } .clist .cadd { opacity: .7; } .clist li .del { display: none; } }
+  .clist li.dragging { z-index: 6; cursor: grabbing; background: var(--card); border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.18); transition: none; }
+  .clist li.drop-before::before, .clist li.drop-after::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; border-radius: 2px; background: var(--accent); }
+  .clist li.drop-before::before { top: -1px; } .clist li.drop-after::after { bottom: -1px; }
+  .clist li.cedit { flex-wrap: wrap; cursor: default; padding: 6px 2px; -webkit-user-select: text; user-select: text; }
+  .clist li.cedit input.ledit { padding: 5px 8px; }
+  .clist li.cedit input[data-f=name] { flex: 1 1 30%; } .clist li.cedit input[data-f=url] { flex: 2 1 45%; }
+  .clist .mini { padding: 5px 10px; font-size: 12px; }
+
   /* ---------- Réglages (fenêtre) ---------- */
   .modal { position: fixed; inset: 0; background: rgba(0,0,0,.3); display: none; align-items: center; justify-content: center; z-index: 10; }
   .modal.open { display: flex; }
@@ -624,10 +658,16 @@
     <div class="seg">
       <button data-tab="anki" class="active">À ajouter dans Anki<span class="n" id="c-anki">0</span></button>
       <button data-tab="search">À creuser<span class="n" id="c-search">0</span></button>
+      <button data-tab="courses">Liens de cours<span class="n" id="c-courses">0</span></button>
     </div>
     <form class="add" id="todoForm" data-list="anki"><input type="text" placeholder="Notion à mettre en carte plus tard"><button class="btn">+</button></form>
-    <div class="scroll"><ul class="list" id="list-todo"></ul></div>
-    <div class="foot"><button class="ghost" id="clearDone">Effacer les éléments cochés</button></div>
+    <form class="cform" id="courseForm" hidden autocomplete="off">
+      <input type="text" id="cName" placeholder="Nom du lien" maxlength="200">
+      <input type="text" id="cUrl" placeholder="https://…" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button class="btn">+</button>
+    </form>
+    <div class="scroll"><ul class="list" id="list-todo"></ul><ul class="list clist" id="list-courses" hidden></ul></div>
+    <div class="foot"><button class="ghost" id="addGroup" type="button" hidden>＋ Nouveau titre</button><button class="ghost" id="clearDone">Effacer les éléments cochés</button></div>
   </section>
 </div><!-- /bottom-right -->
 </div>
@@ -704,14 +744,14 @@ const defaults = {
   rollover: 4,
   pomo: { work: 25, short: 5, long: 15, every: 4 },
   pomoDone: {},       // { "2026-11-13": 3 }
-  items: {}, anki: [], search: []
+  items: {}, anki: [], search: [], courses: []
 };
 let state;
 try { state = Object.assign({}, defaults, JSON.parse(localStorage.getItem(KEY) || "{}")); }
 catch { state = structuredClone(defaults); }
 function normalize() {
   for (const k of ["items", "pomoDone", "workMs"]) if (!state[k] || typeof state[k] !== "object" || Array.isArray(state[k])) state[k] = {};
-  for (const k of ["anki", "search"]) if (!Array.isArray(state[k])) state[k] = [];
+  for (const k of ["anki", "search", "courses"]) if (!Array.isArray(state[k])) state[k] = [];
   state.goals = Object.assign({}, defaults.goals, state.goals);
   state.pomo  = Object.assign({}, defaults.pomo, state.pomo);
   state.rollover ??= defaults.rollover;
@@ -1127,12 +1167,16 @@ function renderLists() {
   if (listEditing) return;   // ne pas écraser un texte en cours de modification
   const today = dayKey();
   document.getElementById("list-items").innerHTML = listHTML(getList("items"), "items", today);
-  document.getElementById("list-todo").innerHTML = listHTML(state[todoTab], todoTab, "");
+  const isC = todoTab === "courses";
+  for (const [id, show] of [["todoForm", !isC], ["list-todo", !isC], ["clearDone", !isC], ["courseForm", isC], ["list-courses", isC], ["addGroup", isC]])
+    document.getElementById(id).hidden = !show;
+  document.getElementById("list-todo").innerHTML = isC ? "" : listHTML(state[todoTab], todoTab, "");
   for (const name of ["items","anki","search"])
     document.getElementById("c-" + name).textContent = getList(name).filter(x => !x.done).length;
   document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("active", b.dataset.tab === todoTab));
   const f = document.getElementById("todoForm");
-  f.dataset.list = todoTab; f.querySelector("input").placeholder = placeholders[todoTab];
+  if (!isC) { f.dataset.list = todoTab; f.querySelector("input").placeholder = placeholders[todoTab]; }
+  renderCourses();
   const past = Object.keys(state.items).filter(k => k !== today && state.items[k].length).sort().reverse().slice(0, 7);
   document.getElementById("history").innerHTML = past.map(k =>
     `<div class="sub">${frDate(k)}</div><ul class="list">${listHTML(state.items[k], "items", k)}</ul>`).join("");
@@ -1161,7 +1205,7 @@ document.addEventListener("click", e => {
     if (t.dataset.act === "del") arr.splice(i, 1);
     save(); renderLists();
   }
-  if (t.id === "clearDone") { state[todoTab] = state[todoTab].filter(x => !x.done); save(); renderLists(); }
+  if (t.id === "clearDone" && todoTab !== "courses") { state[todoTab] = state[todoTab].filter(x => !x.done); save(); renderLists(); }
   const tb = t.closest(".seg button");
   if (tb) { todoTab = tb.dataset.tab; try { localStorage.setItem(KEY + ".tab", todoTab); } catch {} renderLists(); }
 });
@@ -1310,6 +1354,215 @@ document.getElementById("linkForm").addEventListener("submit", e => {
   e.target.reset(); e.target.classList.remove("open");
 });
 
+
+/* ================= Liens de cours (3e onglet de « À ajouter / À creuser ») =================
+   state.courses : une seule liste, dans l'ordre d'affichage.
+     { id, g: 1, name, closed }  = un titre de groupe
+     { id, name, url }           = un lien
+   Un lien appartient au dernier titre placé au-dessus de lui (ceux d'avant le 1er titre n'ont pas de titre). */
+const cEl = id => document.getElementById(id);
+const cHost = u => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+const cUrl = u => { u = (u || "").trim(); if (!u) return ""; return /^https?:\/\//i.test(u) ? u : "https://" + u.replace(/^\/+/, ""); };
+const cIdx = id => state.courses.findIndex(x => x.id === id);
+const cBlockEnd = i => { let j = i + 1; while (j < state.courses.length && !state.courses[j].g) j++; return j; };   // juste après les liens du titre i
+const cOpenAbove = j => { for (let p = j - 1; p >= 0; p--) if (state.courses[p].g) { state.courses[p].closed = false; return; } };
+let cBusy = false;          // modification ou glisser-déposer en cours : on ne redessine pas la liste
+let cTarget = null;         // titre choisi avec son « + » pour le prochain lien ajouté
+let cSuppress = false, cClickTimer = 0, cLastPtr = "mouse";
+
+function renderCourses() {
+  const C = state.courses, ul = cEl("list-courses");
+  cEl("c-courses").textContent = C.filter(x => !x.g).length;
+  if (cBusy) return;
+  if (!C.length) { ul.innerHTML = `<li class="empty">Aucun lien pour l'instant : ajoute un nom et une adresse ci-dessus.</li>`; return; }
+  let html = "", closed = false, inGroup = false;
+  C.forEach((x, i) => {
+    if (x.g) {
+      closed = !!x.closed; inGroup = true;
+      html += `<li class="cgroup${closed ? " closed" : ""}" data-cid="${x.id}">
+        <span class="grip" title="Déplacer">⋮⋮</span><span class="chev">▾</span>
+        <span class="gname">${esc(x.name || "Sans titre")}</span><span class="gcount">${cBlockEnd(i) - i - 1}</span>
+        <button class="ghost cadd" data-cact="addin" type="button" title="Ajouter un lien sous ce titre">+</button>
+        <button class="ghost del edit" data-cact="edit" type="button" title="Renommer">✎</button>
+        <button class="ghost del" data-cact="del" type="button" title="Supprimer le titre">✕</button></li>`;
+    } else if (!closed) {
+      const h = cHost(x.url), name = x.name || h || x.url;
+      html += `<li class="clink${inGroup ? " ingroup" : ""}" data-cid="${x.id}">
+        <span class="grip" title="Déplacer">⋮⋮</span>
+        <span class="fav"><span>${esc((name[0] || "?").toUpperCase())}</span>${h ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(h)}&sz=64" alt="" draggable="false" onload="if (this.naturalWidth > 1) this.parentNode.classList.add('has-icon')" onerror="this.remove()">` : ""}</span>
+        <a class="cname" href="${esc(x.url)}" target="_blank" rel="noopener" draggable="false" title="${esc(x.url)}">${esc(name)}</a>
+        <span class="chost">${esc(h)}</span>
+        <button class="ghost del edit" data-cact="edit" type="button" title="Modifier">✎</button>
+        <button class="ghost del" data-cact="del" type="button" title="Retirer">✕</button></li>`;
+    }
+  });
+  ul.innerHTML = html;
+}
+function cFormHint() {
+  const g = cTarget && state.courses[cIdx(cTarget)];
+  cEl("cName").placeholder = g ? `Nom du lien → ${g.name}` : "Nom du lien";
+}
+
+/* --- Modifier (double-clic, appui long sur téléphone, ou ✎) --- */
+function cEdit(id) {
+  if (cBusy) return;
+  const x = state.courses[cIdx(id)], ul = cEl("list-courses"), li = [...ul.children].find(l => l.dataset.cid === id);
+  if (!x || !li) return;
+  cBusy = true; li.className += " cedit";
+  li.innerHTML = (x.g
+    ? `<input type="text" class="ledit" data-f="name" maxlength="120" placeholder="Titre">`
+    : `<input type="text" class="ledit" data-f="name" maxlength="200" placeholder="Nom">
+       <input type="text" class="ledit" data-f="url" placeholder="https://…" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false">`)
+    + `<button class="btn mini" data-cok type="button">OK</button><button class="ghost" data-cdel type="button" title="Supprimer">🗑</button>`;
+  const ins = [...li.querySelectorAll("input")];
+  ins[0].value = x.name || ""; if (ins[1]) ins[1].value = x.url || "";
+  let done = false;
+  const finish = ok => {
+    if (done) return; done = true; cBusy = false;
+    const cur = state.courses[cIdx(id)];
+    if (ok && cur) {
+      const name = ins[0].value.trim();
+      if (cur.g) { if (name && name !== cur.name) { cur.name = name; save(); } }
+      else {
+        const url = cUrl(ins[1].value), nm = name || cHost(url);
+        if (url && (nm !== cur.name || url !== cur.url)) { cur.name = nm; cur.url = url; save(); }
+      }
+    }
+    renderCourses();
+  };
+  li.addEventListener("mousedown", e => { if (e.target.closest("button")) e.preventDefault(); });   // garder le focus en cliquant OK / 🗑
+  li.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); if (e.target === ins[0] && ins[1]) ins[1].focus(); else finish(true); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  });
+  li.addEventListener("focusout", e => {
+    if (li.contains(e.relatedTarget)) return;
+    setTimeout(() => { if (!li.contains(document.activeElement)) finish(true); }, 0);
+  });
+  li.querySelector("[data-cok]").addEventListener("click", e => { e.stopPropagation(); finish(true); });
+  li.querySelector("[data-cdel]").addEventListener("click", e => { e.stopPropagation(); finish(false); cDelete(id); });
+  ins[0].focus(); ins[0].select();
+}
+function cDelete(id) {
+  const i = cIdx(id), x = state.courses[i]; if (!x) return;
+  if (x.g) {
+    const n = cBlockEnd(i) - i - 1;
+    if (!confirm(n ? `Supprimer le titre « ${x.name} » ? Ses ${n} lien${n > 1 ? "s" : ""} ${n > 1 ? "sont gardés" : "est gardé"} et remonte${n > 1 ? "nt" : ""} dans le groupe au-dessus.` : `Supprimer le titre « ${x.name} » ?`)) return;
+    state.courses.splice(i, 1); cOpenAbove(i);
+  } else {
+    if (!confirm(`Retirer « ${x.name} » ?`)) return;
+    state.courses.splice(i, 1);
+  }
+  if (cTarget === id) { cTarget = null; cFormHint(); }
+  save(); renderCourses();
+}
+
+/* --- Ajouter un lien / un titre --- */
+cEl("courseForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const url = cUrl(cEl("cUrl").value);
+  if (!url) { cEl("cUrl").focus(); return; }   // Entrée dans « Nom » : passe à l'adresse
+  const C = state.courses, item = { id: uid(), name: cEl("cName").value.trim() || cHost(url), url };
+  const g = cTarget ? cIdx(cTarget) : -1;
+  if (g >= 0) { C[g].closed = false; C.splice(cBlockEnd(g), 0, item); }
+  else { C.push(item); cOpenAbove(C.length - 1); }
+  cTarget = null; cFormHint(); e.target.reset(); save(); renderCourses();
+  if (cLastPtr === "mouse") cEl("cName").focus();
+});
+cEl("addGroup").addEventListener("click", () => {
+  const g = { id: uid(), g: 1, name: "Nouveau titre", closed: false };
+  state.courses.push(g); save(); renderCourses(); cEdit(g.id);
+});
+
+/* --- Clic : ouvrir le lien / replier le titre (attend un éventuel double-clic à la souris) --- */
+const cUL = cEl("list-courses");
+cUL.addEventListener("click", e => {
+  if (cSuppress) { e.preventDefault(); e.stopPropagation(); return; }
+  const li = e.target.closest("li[data-cid]"); if (!li || li.classList.contains("cedit")) return;
+  const id = li.dataset.cid, x = state.courses[cIdx(id)]; if (!x) return;
+  const b = e.target.closest("[data-cact]");
+  if (b) {
+    e.preventDefault();
+    if (b.dataset.cact === "edit") cEdit(id);
+    else if (b.dataset.cact === "del") cDelete(id);
+    else { cTarget = id; if (x.closed) { x.closed = false; save(); renderCourses(); } cFormHint(); cEl("cName").focus(); }
+    return;
+  }
+  if (!x.g && (e.metaKey || e.ctrlKey || e.shiftKey)) return;   // ⌘/Ctrl-clic : comportement normal du lien
+  e.preventDefault();
+  clearTimeout(cClickTimer);
+  if (e.detail > 1) return;                                      // 2e clic d'un double-clic : c'est la modification
+  const act = () => {
+    const cur = state.courses[cIdx(id)]; if (!cur) return;
+    if (cur.g) { cur.closed = !cur.closed; save(); renderCourses(); }
+    else window.open(cur.url, "_blank", "noopener");
+  };
+  if (cLastPtr === "mouse") cClickTimer = setTimeout(act, 240); else act();
+});
+cUL.addEventListener("dblclick", e => {
+  const li = e.target.closest("li[data-cid]"); if (!li || li.classList.contains("cedit") || e.target.closest("button")) return;
+  e.preventDefault(); clearTimeout(cClickTimer); cEdit(li.dataset.cid);
+});
+cUL.addEventListener("contextmenu", e => { if (cLastPtr !== "mouse" && e.target.closest("li[data-cid]")) e.preventDefault(); });
+
+/* --- Appui long (téléphone) = modifier ; glisser (souris, ou poignée ⋮⋮ au doigt) = déplacer --- */
+cUL.addEventListener("pointerdown", e => {
+  cLastPtr = e.pointerType || "mouse";
+  const li = e.target.closest("li[data-cid]");
+  if (!li || e.button > 0 || cBusy || li.classList.contains("cedit") || e.target.closest("button,input")) return;
+  const id = li.dataset.cid, x0 = e.clientX, y0 = e.clientY;
+  if (cLastPtr !== "mouse" && !e.target.closest(".grip")) {
+    let fired = false;
+    const t = setTimeout(() => { fired = true; cSuppress = true; navigator.vibrate?.(10); cEdit(id); }, 500);
+    const end = () => { clearTimeout(t); cUL.removeEventListener("pointermove", mv); cUL.removeEventListener("pointerup", upx); cUL.removeEventListener("pointercancel", end); };
+    const mv = ev => { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) end(); };
+    const upx = () => { end(); if (fired) { cUL.querySelector("li.cedit input")?.focus(); setTimeout(() => cSuppress = false, 400); } };
+    cUL.addEventListener("pointermove", mv); cUL.addEventListener("pointerup", upx); cUL.addEventListener("pointercancel", end);
+    return;
+  }
+  const from = cIdx(id); if (from < 0) return;
+  const isG = !!state.courses[from].g, rows = [...cUL.children], moving = [li];
+  if (isG) for (let n = li.nextElementSibling; n && !n.classList.contains("cgroup"); n = n.nextElementSibling) moving.push(n);   // un titre emmène ses liens
+  const others = rows.filter(r => !moving.includes(r));
+  let on = false, drop = null;
+  const clear = () => rows.forEach(r => r.classList.remove("drop-before", "drop-after"));
+  const move = ev => {
+    const dy = ev.clientY - y0;
+    if (!on) {
+      if (Math.abs(dy) + Math.abs(ev.clientX - x0) < 7) return;
+      on = true; cBusy = true; clearTimeout(cClickTimer);
+      moving.forEach(m => m.classList.add("dragging"));
+      try { li.setPointerCapture(ev.pointerId); } catch {}
+    }
+    ev.preventDefault();
+    moving.forEach(m => m.style.transform = `translateY(${dy}px)`);
+    clear(); drop = null;
+    if (!others.length) return;
+    let k = others.findIndex(r => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+    if (isG) {   // un titre se pose devant un autre titre, ou tout en bas
+      while (k >= 0 && k < others.length && !others[k].classList.contains("cgroup")) k++;
+      if (k >= others.length) k = -1;
+    }
+    if (k >= 0) { others[k].classList.add("drop-before"); drop = others[k].dataset.cid; }
+    else { others[others.length - 1].classList.add("drop-after"); drop = ""; }
+  };
+  const up = () => {
+    li.removeEventListener("pointermove", move); li.removeEventListener("pointerup", up); li.removeEventListener("pointercancel", up);
+    if (!on) return;
+    cBusy = false; cSuppress = true; setTimeout(() => cSuppress = false, 0);
+    clear();
+    const C = state.courses, i = cIdx(id);
+    if (drop !== null && i >= 0) {
+      const block = C.splice(i, isG ? cBlockEnd(i) - i : 1);
+      let j = drop ? cIdx(drop) : C.length; if (j < 0) j = C.length;
+      C.splice(j, 0, ...block);
+      if (!isG) cOpenAbove(j);   // posé dans un groupe replié : on le déplie
+      save();
+    }
+    renderCourses();
+  };
+  li.addEventListener("pointermove", move); li.addEventListener("pointerup", up); li.addEventListener("pointercancel", up);
+});
 
 /* ================= Heures de début / fin de journée ================= */
 const fmtH = h => { let hh = Math.floor(h), mm = Math.round((h - hh) * 60); if (mm === 60) { hh++; mm = 0; } return mm ? `${hh} h ${String(mm).padStart(2, "0")}` : `${hh} h`; };
@@ -1697,7 +1950,7 @@ function sameFlat(a, b) {
   const ka = Object.keys(a);
   return ka.length === Object.keys(b).length && ka.every(k => a[k] === b[k]);
 }
-const hasData = s => !!s && (Object.values(s.items || {}).some(a => a && a.length) || (s.anki || []).length || (s.search || []).length ||
+const hasData = s => !!s && (Object.values(s.items || {}).some(a => a && a.length) || (s.anki || []).length || (s.search || []).length || (s.courses || []).length ||
   ((s.imp || {}).todos || []).length || ((s.imp || {}).calls || []).length);
 
 /* remplace le contenu de `state` sans casser les références (imp) */
