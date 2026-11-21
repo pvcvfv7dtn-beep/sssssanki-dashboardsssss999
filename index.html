@@ -3670,7 +3670,7 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
   const P = document.getElementById("paper"), slot = document.getElementById("vimpSlot"), thread = document.getElementById("thread");
   const app = document.querySelector(".app"), sw = document.getElementById("screenSwitch");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
-  let onVie = false, busy = false, needQuiet = false, lastWheel = 0, gesture = null;
+  let onVie = false, busy = false, needQuiet = false, lastWheel = 0, gesture = null, seq = 0, safety = 0;
 
   const placeInVie = () => { P.classList.add("inVie"); slot.appendChild(P); };
   const placeInAnki = () => { P.classList.remove("inVie"); app.insertBefore(P, app.querySelector(".bottom-right")); try { applyCollapsed(); } catch {} };
@@ -3692,6 +3692,8 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
   function go(toVie) {
     if (busy || toVie === onVie) return;
     busy = true; needQuiet = true;
+    const my = ++seq; clearTimeout(safety);
+    try { P.getAnimations().forEach(a => a.cancel()); } catch {}   // aucune animation d'un passage précédent ne doit rester accrochée
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     const from = P.getBoundingClientRect(), tgt = toVie ? V : A;
     if (toVie) { V.scrollTop = 0; placeInVie(); } else placeInAnki();
@@ -3703,8 +3705,11 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
     Object.assign(P.style, { left: from.left + "px", top: from.top + "px", width: from.width + "px", height: from.height + "px" });
     onVie = toVie; setSwitch();
     document.body.classList.toggle("onVie", toVie);
+    /* chaque passage ne peut poser « Important » que pour lui-même : une sécurité tardive d'un passage précédent
+       ne doit pas le ranger dans l'autre écran pendant le passage suivant */
     const land = () => {
-      if (!busy) return;
+      if (my !== seq || !busy) return;
+      clearTimeout(safety);
       P.removeAttribute("style"); P.classList.remove("flying");
       if (toVie) placeInVie(); else placeInAnki();
       busy = false;
@@ -3716,9 +3721,15 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
     const anim = P.animate([box(from, 1, flat), Object.assign(box(midR, 1.04, "0 24px 50px rgba(40,30,0,.30)"), { offset: .5 }), box(to, 1, flat)],
       { duration: 900, easing: "cubic-bezier(.45,0,.2,1)", fill: "forwards" });
     anim.onfinish = () => { land(); anim.cancel(); };
-    setTimeout(() => { try { anim.cancel(); } catch {} land(); }, 1600);
+    safety = setTimeout(() => { if (my !== seq) return; try { anim.cancel(); } catch {} land(); }, 1600);
   }
   window.screenGo = go;
+  setInterval(() => {
+    if (busy) return;
+    const wantVie = onVie, inVie = slot.contains(P), inAnki = app.contains(P);
+    if (wantVie && !inVie) { P.removeAttribute("style"); P.classList.remove("flying"); placeInVie(); }
+    else if (!wantVie && !inAnki) { P.removeAttribute("style"); P.classList.remove("flying"); placeInAnki(); }
+  }, 1000);
 
   /* molette / pavé tactile : un geste = un passage, s'il a commencé au bord de l'écran */
   addEventListener("wheel", e => {
