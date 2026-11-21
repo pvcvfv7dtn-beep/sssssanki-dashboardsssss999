@@ -297,9 +297,15 @@
   .ghostveil { position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden; }
   .paintband { position: absolute; left: -2%; right: -2%; top: 0; will-change: transform;
     background: linear-gradient(180deg, rgba(18,18,20,0) 0%, rgba(18,18,20,.25) 12%, rgba(18,18,20,.7) 24%, rgba(19,19,21,.94) 36%, rgb(21,21,23) 60%);   /* gris presque noir, neutre ; long dégradé à l'arrière */
-    -webkit-backdrop-filter: blur(14px) saturate(.6); backdrop-filter: blur(14px) saturate(.6);
   }
-  .paintband .drip { position: absolute; top: 100%; margin-top: -1px; border-radius: 0 0 999px 999px; background: rgb(21,21,23); }
+  /* nappes de flou : backdrop-filter (calculé par la carte graphique), bord en vagues via un masque */
+  .paintband .painthaze { position: absolute; left: 0; right: 0; z-index: -2; pointer-events: none;
+    -webkit-backdrop-filter: blur(9px) saturate(.7) contrast(.92); backdrop-filter: blur(9px) saturate(.7) contrast(.92); }
+  .paintband .painthaze.ahead { top: 100%; height: 340px;
+    -webkit-mask: linear-gradient(180deg, #000 0, #000 35%, transparent 100%); mask: linear-gradient(180deg, #000 0, #000 35%, transparent 100%); }
+  .paintband .painthaze.behind { top: -260px; height: 300px;
+    -webkit-mask: linear-gradient(0deg, #000 0, #000 30%, transparent 100%); mask: linear-gradient(0deg, #000 0, #000 30%, transparent 100%); }
+  .paintband .drip { position: absolute; z-index: -1; border-radius: 0 0 999px 999px; background: rgb(21,21,23); will-change: transform; }
   .paintband .drip { border-radius: 0 0 50% 50% / 0 0 min(50%, 26px) min(50%, 26px); }   /* bout arrondi, comme une goutte */
   body.ghost-snap *, body.ghost-snap *::before, body.ghost-snap *::after { transition: none !important; }
   .ghostfly { position: fixed; z-index: 61; pointer-events: none; font-size: 18px; line-height: 1; filter: drop-shadow(0 0 10px rgba(190,200,255,.7)); }
@@ -2212,27 +2218,32 @@ function ghostFx(on) {
   const W = innerWidth, H = innerHeight, BAND = Math.round(H * 2.1), FADE = .36;   // FADE : part haute de la bande en dégradé
   const veil = document.createElement("div"); veil.className = "ghostveil";
   const band = document.createElement("div"); band.className = "paintband"; band.style.height = BAND + "px";
-  /* coulures : largeurs et longueurs au hasard, plus nombreuses au centre */
+  /* coulures : longues et fines, ou courtes et larges ; elles sortent de sous la bande (simple glissement, très fluide) */
   const drips = [], n = Math.max(16, Math.round(W / 48));
   for (let i = 0; i < n; i++) {
     const d = document.createElement("div"); d.className = "drip";
-    const big = Math.random() < .35, w = big ? 16 + Math.random() * 26 : 26 + Math.random() * 60;   // longues coulures fines, ou bourrelets courts et larges
+    const big = Math.random() < .35, w = big ? 16 + Math.random() * 26 : 26 + Math.random() * 60;
     const len = big ? 70 + Math.random() * 200 : 6 + Math.random() * 26;
-    Object.assign(d.style, { left: ((i + .15 + Math.random() * .7) / n * 100) + "%", width: w + "px", marginLeft: -w / 2 + "px" });
-    band.appendChild(d); drips.push({ d, len, delay: Math.random() * .25 });
+    Object.assign(d.style, { left: ((i + .15 + Math.random() * .7) / n * 100) + "%", width: w + "px", marginLeft: -w / 2 + "px", height: (len + 14) + "px", top: (100 - 0) + "%", marginTop: -(len + 14) + "px" });
+    band.appendChild(d); drips.push({ d, len: len + 12, delay: Math.random() * .25 });
   }
+  /* flou déformant : une nappe de flou à bord ondulé précède les coulures et reste un peu derrière la peinture */
+  const hazeA = document.createElement("div"), hazeB = document.createElement("div");
+  hazeA.className = "painthaze ahead"; hazeB.className = "painthaze behind";
+  band.appendChild(hazeA); band.appendChild(hazeB);
   veil.appendChild(band); document.body.appendChild(veil);
   const b = byId("ghostBtn").getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height / 2;
   const fly = document.createElement("div"); fly.className = "ghostfly"; fly.textContent = "👻";
   Object.assign(fly.style, { left: x + "px", top: y + "px" }); document.body.appendChild(fly);
-  const maxDrip = 290, from = -(BAND + maxDrip), to = H + 40, dur = on ? 1900 : 1600, t0 = performance.now();
-  const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // départ doux, coulée, arrivée douce
+  const maxDrip = 290, top = -(BAND + maxDrip), bottom = H + 40, dur = on ? 1900 : 1700, t0 = performance.now();
+  const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   let switched = false;
   const frame = now => {
-    const k = Math.min(1, (now - t0) / dur), yy = from + (to - from) * ease(k);
+    const k = Math.min(1, (now - t0) / dur), kk = on ? k : 1 - k;              // désactivation : même coulée, jouée à l'envers (elle remonte)
+    const yy = top + (bottom - top) * ease(kk);
     band.style.transform = `translate3d(0,${yy.toFixed(1)}px,0)`;
-    for (const o of drips) { const p = Math.max(0, Math.min(1, (k - o.delay) / (.7 - o.delay * .5))); o.d.style.height = (12 + o.len * (1 - Math.pow(1 - p, 2))).toFixed(1) + "px"; }
-    if (!switched && yy + BAND * FADE <= 0 && yy + BAND >= H) { switched = true; ghostSnap(on); }   // écran entièrement couvert par la partie opaque
+    for (const o of drips) { const p = Math.max(0, Math.min(1, (kk - o.delay) / (.7 - o.delay * .5))); o.d.style.transform = `translate3d(0,${(o.len * (1 - Math.pow(1 - p, 2))).toFixed(1)}px,0)`; }
+    if (!switched && yy + BAND * FADE <= 0 && yy + BAND >= H) { switched = true; ghostSnap(on); }
     if (k < 1) requestAnimationFrame(frame);
     else { if (!switched) ghostSnap(on); veil.remove(); fly.remove(); }
   };
