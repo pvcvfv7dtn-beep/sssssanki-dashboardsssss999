@@ -1576,12 +1576,52 @@ function setView(v) {
 document.querySelectorAll(".vtoggle button").forEach(b => b.onclick = () => setView(b.dataset.view));
 
 const host = u => { try { return new URL(u).hostname; } catch { return ""; } };
+/* Icône d'un lien : on essaie plusieurs sources dans l'ordre, jusqu'à une vraie icône du site.
+   1. icônes propres aux outils Google (Sheets, Docs, Slides…) selon l'adresse
+   2. l'icône du site lui-même (apple-touch-icon, grande et nette, puis /favicon.ico)
+   3. Google, en refusant son globe générique (renvoyé en 16 px quand il ne connaît pas le site)
+   4. DuckDuckGo
+   5. les mêmes services pour le domaine parent (ex. u-bordeaux.fr pour webmel.u-bordeaux.fr)
+   Sinon : la lettre. La source qui marche est mémorisée sur cet appareil. */
+const ICONS_KEY = KEY + ".icons";
+let iconMemo = (() => { try { return JSON.parse(localStorage.getItem(ICONS_KEY) || "{}"); } catch { return {}; } })();
+const GS = "https://ssl.gstatic.com/";
+const GOOGLE_APPS = [[/^docs\.google\.com\/spreadsheets/, GS + "docs/spreadsheets/favicon3.ico"], [/^docs\.google\.com\/document/, GS + "docs/documents/images/kix-favicon7.ico"],
+  [/^docs\.google\.com\/presentation/, GS + "docs/presentations/images/favicon5.ico"], [/^docs\.google\.com\/forms/, GS + "docs/spreadsheets/forms/favicon_qp2.png"],
+  [/^drive\.google\.com/, GS + "images/branding/product/1x/drive_2020q4_32dp.png"], [/^mail\.google\.com/, GS + "images/branding/product/1x/gmail_2020q4_32dp.png"],
+  [/^calendar\.google\.com/, GS + "images/branding/product/1x/calendar_2020q4_32dp.png"]];
+function iconCandidates(l) {
+  let u; try { u = new URL(l.url); } catch { return []; }
+  const h = u.hostname.replace(/^www\./, ""), hp = u.hostname + u.pathname, out = [];
+  const g = d => `https://www.google.com/s2/favicons?domain=${d}&sz=128`, ddg = d => `https://icons.duckduckgo.com/ip3/${d}.ico`;
+  if (l.icon) out.push(l.icon);
+  for (const [re, ic] of GOOGLE_APPS) if (re.test(hp)) out.push(ic);
+  out.push(u.origin + "/apple-touch-icon.png", u.origin + "/favicon.ico", g(u.hostname), ddg(u.hostname));
+  const parts = h.split("."), parent = parts.length > 2 ? parts.slice(-2).join(".") : "";
+  if (parent && !/^(co|com|org|gouv|ac)\./.test(parent)) out.push(g(parent), ddg(parent), "https://" + parent + "/favicon.ico");
+  const memo = iconMemo[l.url];
+  return memo ? [memo, ...out.filter(x => x !== memo)] : out;
+}
+function iconImg(l) {
+  const c = iconCandidates(l); if (!c.length) return "";
+  return `<img src="${esc(c[0])}" alt="" draggable="false" referrerpolicy="no-referrer" data-k="${esc(l.url)}" data-c="${esc(JSON.stringify(c))}" data-i="0" onload="iconOk(this)" onerror="iconNext(this)">`;
+}
+function iconNext(img) {
+  const c = JSON.parse(img.dataset.c), i = +img.dataset.i + 1;
+  if (iconMemo[img.dataset.k] === c[i - 1]) { delete iconMemo[img.dataset.k]; try { localStorage.setItem(ICONS_KEY, JSON.stringify(iconMemo)); } catch {} }
+  if (i < c.length) { img.dataset.i = i; img.src = c[i]; } else img.remove();
+}
+function iconOk(img) {
+  const src = img.getAttribute("src"), w = img.naturalWidth;
+  if (w <= 1 || (/google\.com\/s2\//.test(src) && w <= 16)) return iconNext(img);   // image vide, ou globe générique de Google
+  img.parentNode.classList.add("has-icon");
+  if (iconMemo[img.dataset.k] !== src) { iconMemo[img.dataset.k] = src; try { localStorage.setItem(ICONS_KEY, JSON.stringify(iconMemo)); } catch {} }
+}
 function renderLinks() {
   document.getElementById("links").innerHTML = state.links.map((l, i) => `
     <a class="tile" href="${esc(l.url)}" target="_blank" rel="noopener" title="${esc(l.name)}">
       <span class="letter">${esc((l.name || "?")[0].toUpperCase())}</span>
-      <img src="${esc(l.icon || `https://www.google.com/s2/favicons?domain=${host(l.url)}&sz=128`)}" alt=""
-           onload="if (this.naturalWidth > 1) this.parentNode.classList.add('has-icon')" onerror="this.remove()">
+      ${iconImg(l)}
       <button class="x" data-dellink="${i}" title="Retirer">✕</button>
     </a>`).join("") + `<button class="tile add" id="addLink" title="Ajouter un lien">+</button>`;
 }
