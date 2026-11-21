@@ -2307,10 +2307,21 @@ function canon(j) {
 }
 /* contenu « Vie » par défaut (créé à l'ouverture tant que rien n'est arrivé du cloud) : ce n'est pas une modification de l'utilisateur */
 const isVieDefault = (p, j) => p.startsWith("vie" + SEP) && j !== undefined && !!window.vieDefaults && window.vieDefaults[p.slice(4)] === canon(j);
+/* Valeur « vide / par défaut » d'une clé que cet appareil n'a encore jamais reçue du cloud (appareil resté sur une ancienne version) :
+   ce n'est pas une modification de l'utilisateur, elle ne doit pas écraser le cloud (ex. Liens de cours vidés). */
+let defaultsFlat = null;
+function isDefault(p, j) {
+  if (j === undefined) return false;
+  const c = canon(j);
+  if (c === "[]" || c === "{}" || c === "null" || c === '""') return true;
+  if (isVieDefault(p, j)) return true;
+  if (!defaultsFlat) { defaultsFlat = {}; const f = flat(structuredClone(defaults)); for (const k in f) defaultsFlat[k] = canon(f[k]); }
+  return defaultsFlat[p] === c;
+}
 function merge3(L, B, R) {
   const out = {};
   for (const p of new Set([...Object.keys(L), ...Object.keys(B), ...Object.keys(R)])) {
-    let v = L[p] !== B[p] && !(B[p] === undefined && R[p] !== undefined && isVieDefault(p, L[p])) ? L[p] : R[p];
+    let v = L[p] !== B[p] && !(B[p] === undefined && R[p] !== undefined && isDefault(p, L[p])) ? L[p] : R[p];
     if (p === "pomoLive" && L[p] && R[p] && L[p] !== B[p] && R[p] !== B[p]) v = pickPomo(L[p], R[p]);
     if (v !== undefined) out[p] = v;
   }
@@ -2380,7 +2391,7 @@ async function syncNow() {
         if (!/conflict/i.test(e.message)) throw e;
         // un autre appareil a écrit entre-temps : on garde la base « locale vs cloud lu » et on refusionne
         const B = baseStr === null ? (M === L ? {} : R) : JSON.parse(baseStr), nb = {};
-        for (const p of new Set([...Object.keys(B), ...Object.keys(R)])) { const v = L[p] !== B[p] && !(B[p] === undefined && R[p] !== undefined && isVieDefault(p, L[p])) ? B[p] : R[p]; if (v !== undefined) nb[p] = v; }
+        for (const p of new Set([...Object.keys(B), ...Object.keys(R)])) { const v = L[p] !== B[p] && !(B[p] === undefined && R[p] !== undefined && isDefault(p, L[p])) ? B[p] : R[p]; if (v !== undefined) nb[p] = v; }
         localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(nb));
         syncAgain = true; return;
       }
