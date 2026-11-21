@@ -2546,12 +2546,10 @@ async function syncNow() {
     const L = flat(state), R = remote ? flat(remote) : null;
     let M;
     if (!R) M = L;                                         // cloud vide : cet appareil l'initialise
-    else if (baseStr === null) {                           // 1re synchro de cet appareil : le cloud fait foi…
-      M = R;
-      if (hasData(state) && !sameFlat(L, R) &&
-          !confirm("Le cloud contient déjà des données.\n\nOK : utiliser celles du cloud sur cet appareil.\nAnnuler : remplacer le cloud par les données de cet appareil."))
-        M = L;                                             // …sauf si on choisit de garder cet appareil
-    } else M = merge3(L, JSON.parse(baseStr), R);
+    else if (baseStr === null) M = R;                     // 1re synchro de cet appareil : le cloud fait toujours foi.
+    /* (avant, une question proposait de remplacer le cloud par cet appareil : un appareil aux vieilles données l'a écrasé le 21/11.
+        Remplacer le cloud reste possible, volontairement, avec « Envoyer cet appareil vers le cloud » dans les réglages.) */
+    else M = merge3(L, JSON.parse(baseStr), R);
     if (!sameFlat(M, L)) applyState(unflat(M));
     if (!R || !sameFlat(M, R)) {
       try { await rpc("dash_put", { p_id: "state", p_data: unflat(M), p_rev: all.state ? all.state.rev : 0 }); }
