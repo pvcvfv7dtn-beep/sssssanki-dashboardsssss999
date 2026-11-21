@@ -305,22 +305,22 @@
   body.ghost .a-items:not(.peek), body.ghost .a-lists:not(.peek), body.ghost .app > .paper:not(.peek) { filter: blur(3px) brightness(.55) saturate(.3); opacity: .45; }
   body.ghost .a-items.peek, body.ghost .a-lists.peek, body.ghost .app > .paper.peek { filter: brightness(.94); }
   @media (min-width: 901px) and (min-aspect-ratio: 4/3) {
-    body.ghost .app, body.ghost .app.imp-off { grid-template-rows: calc((100% - 28px) * 0.38) fit-content(calc((100% - 28px) * 0.36)) minmax(0, 1fr); }
+    body.ghost .app, body.ghost .app.imp-off { grid-template-rows: calc((100% - 28px) * 0.335) fit-content(calc((100% - 28px) * 0.38)) minmax(0, 1fr); }
   }
-  @media (max-width: 900px), (max-aspect-ratio: 4/3) { body.ghost .app { grid-template-rows: 250px auto auto auto auto; } }
+  @media (max-width: 900px), (max-aspect-ratio: 4/3) { body.ghost .app { grid-template-rows: 230px auto auto auto auto; } }
   .app .ring, .ring .clock, .a-anki .label, .a-anki .value, .a-anki .value b, .a-anki .bar, .a-anki .legend, .day .time, .daypct .big, .daypct .small { transition: all .4s ease; }
-  body.ghost .app .ring { max-height: 267px; }
-  body.ghost .ring .clock { font-size: clamp(23px, 2.5vw, 39px); }
-  body.ghost .ring .mode { font-size: 12px; }
-  body.ghost .a-anki .label { font-size: 15.5px; }
-  body.ghost .a-anki .value { font-size: 14px; }
-  body.ghost .a-anki .value b { font-size: 18px; }
-  body.ghost .a-anki .bar { height: 15px; border-radius: 8px; }
-  body.ghost .a-anki .block + .block { margin-top: 24px; }
-  body.ghost .a-anki .legend { font-size: 13px; }
-  body.ghost .day .time { font-size: clamp(24px, 2.35vw, 36px); }
-  body.ghost .daypct .big { font-size: 15px; }
-  body.ghost .daypct .small { font-size: 12px; }
+  body.ghost .app .ring { max-height: 236px; }
+  body.ghost .ring .clock { font-size: clamp(21px, 2.2vw, 34px); }
+  body.ghost .ring .mode { font-size: 11.5px; }
+  body.ghost .a-anki .label { font-size: 14.8px; }
+  body.ghost .a-anki .value { font-size: 13.5px; }
+  body.ghost .a-anki .value b { font-size: 16.5px; }
+  body.ghost .a-anki .bar { height: 13.5px; border-radius: 7px; }
+  body.ghost .a-anki .block + .block { margin-top: 21px; }
+  body.ghost .a-anki .legend { font-size: 12.5px; }
+  body.ghost .day .time { font-size: clamp(22px, 2.1vw, 32px); }
+  body.ghost .daypct .big { font-size: 14px; }
+  body.ghost .daypct .small { font-size: 11.5px; }
   .worktot { position: absolute; top: 11px; right: 14px; z-index: 1; font: 200 13px/1 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; letter-spacing: .01em; color: var(--text); opacity: .75; font-variant-numeric: tabular-nums; }
   .ring .clock.over { color: #d9822b; }
   .tomato {
