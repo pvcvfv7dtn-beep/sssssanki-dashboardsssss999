@@ -3925,17 +3925,36 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
     else if (!wantVie && !inAnki) { P.removeAttribute("style"); P.classList.remove("flying"); placeInAnki(); }
   }, 1000);
 
+  /* Dans un tableau qui défile (liste, feuille…), arrivé au bout il faut un 2e geste pour changer d'écran :
+     le 1er « arme » le passage (petit rebond), le suivant dans les 2,5 s passe à l'autre écran. */
+  let armed = null;
+  function scrollBox(t) {
+    for (let el = t; el && el !== A && el !== V && el !== document.body; el = el.parentElement) {
+      if (el.scrollHeight > el.clientHeight + 1) { const oy = getComputedStyle(el).overflowY; if (oy === "auto" || oy === "scroll") return el; }
+    }
+    return null;
+  }
+  function tryGo(toVie, t) {
+    const dir = toVie ? 1 : -1, now = Date.now();
+    if (scrollBox(t) && !(armed && armed.dir === dir && now < armed.until)) {
+      armed = { dir, until: now + 2500 };
+      const box = scrollBox(t);
+      try { box.animate([{ transform: "none" }, { transform: `translateY(${-dir * 8}px)` }, { transform: "none" }], { duration: 260, easing: "ease-out" }); } catch {}
+      return;
+    }
+    armed = null; go(toVie);
+  }
   /* molette / pavé tactile : un geste = un passage, s'il a commencé au bord de l'écran */
   addEventListener("wheel", e => {
     if (modalOpen() || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
     const now = Date.now(), fresh = now - lastWheel > 280; lastWheel = now;
     if (busy) { e.preventDefault(); return; }
-    if (fresh) { needQuiet = false; gesture = { down: !onVie && atEdge(1), up: onVie && atEdge(-1) }; }
+    if (fresh) { needQuiet = false; gesture = { down: !onVie && atEdge(1), up: onVie && atEdge(-1), inner: innerScroll(e.target, Math.sign(e.deltaY)) }; }
     if (needQuiet || !gesture) return;
     const dir = Math.sign(e.deltaY); if (!dir) return;
     if (innerScroll(e.target, dir)) return;
-    if (dir > 0 && gesture.down) { e.preventDefault(); go(true); }
-    else if (dir < 0 && gesture.up) { e.preventDefault(); go(false); }
+    if (gesture.inner) { needQuiet = true; return; }   // ce geste a fait défiler un tableau jusqu'au bout : il ne compte pas
+    if ((dir > 0 && gesture.down) || (dir < 0 && gesture.up)) { e.preventDefault(); needQuiet = true; tryGo(dir > 0, e.target); }
   }, { passive: false });
 
   /* doigt : un petit glissement vertical au bord suffit */
@@ -3945,7 +3964,7 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
     if (busy || modalOpen() || e.touches.length > 1) return;
     const t = e.target;
     if (t.closest && t.closest(".hd,.ghd,.grip,.vtrack,input,textarea,select,.person")) return;
-    t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY,
+    t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY, t,
       down: !onVie && atEdge(1) && !innerScroll(t, 1), up: onVie && atEdge(-1) && !innerScroll(t, -1) };
   }, { passive: true });
   addEventListener("touchmove", e => {
@@ -3954,7 +3973,7 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
     if (Math.abs(dx) > Math.abs(dy)) return;
     if ((dy > 0 && t0.down) || (dy < 0 && t0.up)) {
       if (e.cancelable) e.preventDefault();
-      if (Math.abs(dy) > 28) { const v = dy > 0; t0 = null; go(v); }
+      if (Math.abs(dy) > 28) { const v = dy > 0, tg = t0.t; t0 = null; tryGo(v, tg); }
     }
   }, { passive: false });
   addEventListener("touchend", () => { t0 = null; });
