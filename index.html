@@ -55,6 +55,7 @@
   .a-pomo { grid-area: pomo; } .a-anki { grid-area: anki; } .a-day { grid-area: day; }
   .a-items { grid-area: items; } .a-lists { grid-area: lists; } .a-imp { grid-area: imp; align-self: start; justify-self: start; width: min(100%, 340px); }
   .app.imp-off .a-imp { align-self: end; }
+  @media (min-width: 901px) and (min-aspect-ratio: 4/3) { .app.imp-off { grid-template-rows: calc((100% - 28px) * 0.29) fit-content(calc((100% - 28px) * 0.70)) minmax(0, 1fr); } }
   /* Les deux cases du bas s'alignent sur la plus remplie, plafonnées à l'espace dispo */
 
   /* Version mobile / fenêtre étroite : tout s'empile */
@@ -501,9 +502,253 @@
   .modal label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; gap: 12px; }
   .modal input[type=number] { flex: 0 0 80px; text-align: right; }
   .modal .sub:first-of-type { margin-top: 0; }
+
+  /* ================= Partie « Vie » (isolée sous #vie) ================= */
+  #vie { --bg:#f3f2ee;--panel:#ffffff;--card:#f7f6f3;--ink:#1d1d1f;--mute:#86868b;--line:#e7e5e0;--acc:#2f6fde;--acc2:#e7eefb;--good:#2e8b57;--good2:#e4f3ea;--warn:#b8691a;--warn2:#fcefe0;--bad:#d64545;--bad2:#fbe5e5; color:var(--ink); font:15px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; min-height:100vh; padding-bottom:84px; }
+  :root[data-theme="dark"] #vie { --bg:#161618;--panel:#252527;--card:#2e2e31;--ink:#f2f2f7;--mute:#98989d;--line:#38383a;--acc:#5e9bff;--acc2:#1d2b45;--good:#4cc38a;--good2:#16301f;--warn:#f2a043;--warn2:#33270f;--bad:#ff6b6b;--bad2:#3a1c1c; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) #vie { --bg:#161618;--panel:#252527;--card:#2e2e31;--ink:#f2f2f7;--mute:#98989d;--line:#38383a;--acc:#5e9bff;--acc2:#1d2b45;--good:#4cc38a;--good2:#16301f;--warn:#f2a043;--warn2:#33270f;--bad:#ff6b6b;--bad2:#3a1c1c; } }
+  #vie .rb ul, #vie .rb ol { padding-left:20px; }
+  #vie #vtoast { bottom:66px; }
+  #vie #vimp { grid-area:i; align-self:start; width:100%; max-height:none; overflow:visible; position:sticky; top:16px; }
+  #vie #vimp .jx.late { font-size:9.5px; font-weight:600; background:none; padding:0; border-radius:0; }
+  #vie #vimp .call .lbl { display:flex; align-items:center; gap:6px; }
+  #vie #vimp .vpadd { border:0; background:none; color:var(--ink2); font-size:14px; line-height:1; padding:0 4px; border-radius:6px; cursor:pointer; }
+  #vie #vimp .vpadd:hover { background:rgba(255,255,255,.5); }
+  #vie #vimp .ptodo .txt { cursor:default; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+  @media (max-width: 760px) { #vie #vimp { position:static; } }
+#vie *{min-width:0}
+:where(#vie) button{font:inherit;color:inherit;cursor:pointer}
+#vie .top{padding:18px clamp(16px,2.5vw,32px) 4px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+#vie h1{font-size:30px;line-height:1.05;margin:0;letter-spacing:-.01em}
+#vie .sub{color:var(--mute);font-size:14px}
+#vie .wrap{padding:12px clamp(16px,2.5vw,32px) 40px;display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);grid-template-areas:"i s" "i c" "i r";grid-template-rows:auto auto 1fr;gap:16px;align-items:start}
+#vie #p-since{grid-area:s}
+#vie #p-cd{grid-area:c}
+#vie #p-rec{grid-area:r}
+#vie .panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 1px 3px rgba(16,24,40,.06)}
+#vie .pen{border:0;background:none;color:var(--mute);font-size:16px;padding:4px 6px;line-height:1;opacity:.7}
+#vie .tiles{display:flex;flex-wrap:wrap;gap:6px}
+#vie .tiles>*{flex:0 1 auto;max-width:100%}
+#vie .vtile{position:relative;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 12px 6px 22px;min-height:40px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .12s}
+#vie .vtile:active{transform:scale(.98)}
+#vie .vtile:hover{border-color:color-mix(in srgb,var(--acc) 40%,var(--line))}
+#vie .vtile b{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vie .vtile small{flex:none;margin-left:6px;white-space:nowrap;font-size:14px;font-weight:700;color:var(--mute);font-variant-numeric:tabular-nums}
+#vie .vtile .fq{font-weight:500;opacity:.7}
+#vie .vtile.good small{color:var(--good)}
+#vie .vtile.mid small{color:var(--warn)}
+#vie .vtile.mid{background:var(--warn2);border-color:transparent}
+#vie .vtile.bad{background:var(--bad2);border-color:transparent}
+#vie .vtile.bad small{color:var(--bad)}
+#vie .vtile.nh{padding-left:12px}
+#vie .lnk{text-decoration:none;color:inherit}
+#vie .lnk small{color:var(--acc)}
+#vie .vtile.ed{border-style:dashed}
+#vie .vseg{flex:1;display:flex;background:color-mix(in srgb,var(--mute) 14%,transparent);border-radius:12px;padding:4px;gap:4px}
+#vie .vseg button{flex:1;-webkit-touch-callout:none;user-select:none;border:0;background:none;border-radius:8px;padding:6px 10px;font-weight:600;font-size:15px;color:var(--mute);white-space:nowrap}
+#vie .vseg button.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.12)}
+#vie .vseg button{padding:8px 10px}
+#vie .tdl{min-height:0}
+#vie .tdl:empty{display:none}
+#vie .td{display:flex;align-items:center;gap:14px;padding:8px 0 8px 2px;min-height:52px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#vie .td .hd{opacity:0;transition:opacity .15s}
+#vie .td:hover .hd{opacity:.5}
+@media(hover:none){#vie .td .hd{opacity:.3}}
+#vie .ck{flex:none;width:22px;height:22px;border:1.5px solid color-mix(in srgb,var(--mute) 80%,transparent);border-radius:5px;display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff}
+#vie .td.vdone .ck{background:var(--acc);border-color:var(--acc)}
+#vie .tn{flex:1;font-size:17px;overflow-wrap:anywhere}
+#vie .td.vdone .tn{color:var(--mute);text-decoration:line-through}
+#vie .qadd{display:flex;gap:10px;margin-bottom:6px}
+#vie .qadd input{flex:1;font:inherit;font-size:17px;padding:11px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
+#vie .qadd input:focus{border-color:var(--acc);outline:none}
+#vie .qbtn{flex:none;width:48px;border:0;border-radius:12px;background:var(--acc);color:#fff;font-size:22px;font-weight:600}
+#vie .lnkbtn{border:0;background:none;color:var(--mute);font-size:15px;padding:8px 4px}
+#vie .lnkbtn:hover{color:var(--ink)}
+#vie .bar2.r{justify-content:flex-end}
+#vie .sc{font-weight:500;color:var(--mute);margin-left:6px}
+#vie .bar2{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+#vie .vghost.on{background:var(--acc2);color:var(--acc);border-color:transparent}
+#vie .vtile .cj{color:var(--acc)}
+#vie .vtile.past .cj{color:var(--bad)}
+#vie .vtile.now{background:color-mix(in srgb,var(--acc) 12%,transparent);border-color:color-mix(in srgb,var(--acc) 30%,transparent)}
+#vie .vtile.past{background:color-mix(in srgb,var(--bad) 12%,transparent);border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
+#vie .vtile .mini{padding:1px 7px;font-size:13px}
+#vie .vtile .hd{position:absolute;top:50%;left:1px;transform:translateY(-50%);font-size:13px;padding:6px 4px}
+#vie .tadd{border:1.5px dashed color-mix(in srgb,var(--mute) 45%,transparent);background:none;border-radius:10px;color:var(--mute);font-size:18px;min-height:40px;width:48px}
+#vie .log{margin-top:8px;padding:0 6px}
+#vie .log div{display:flex;justify-content:space-between;gap:10px;color:var(--mute);font-size:14px;padding:1px 0}
+#vie .log span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}
+#vie .cdg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px}
+#vie .ph{display:flex;align-items:center;gap:8px;margin-bottom:10px;min-height:36px;width:100%;background:none;border:0;padding:0;text-align:left}
+#vie .ph h2{font-size:19px;margin:0}
+#vie .ph .pen,#vie .gh .pen{margin-right:auto}
+#vie .vghost{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:6px 11px;font-size:14px;min-height:36px}
+#vie .late{font-size:13px;font-weight:600;color:var(--bad);background:var(--bad2);padding:3px 9px;border-radius:10px}
+#vie .grp{margin-bottom:12px}
+#vie .gh{display:flex;align-items:center;gap:8px;padding:6px 4px;font-size:13px;font-weight:700;color:var(--mute);cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#vie .gh.nog{display:none}
+#vie .gh b{font-size:13px;text-transform:uppercase;letter-spacing:.09em}
+#vie .cnt{font-size:13px;color:var(--mute);background:var(--line);border-radius:9px;padding:1px 8px;font-weight:600}
+#vie .hd,#vie .ghd{flex:none;color:var(--mute);opacity:.55;cursor:grab;touch-action:none;padding:6px 4px;font-size:18px;line-height:1}
+#vie .ghd{font-size:15px;padding:2px 4px}
+#vie .list{min-height:6px}
+#vie .list.shut{display:none}
+#vie .list:empty::after{content:"Aucun élément";display:block;color:var(--mute);font-size:13px;padding:6px 8px}
+#vie .cd,#vie .rc{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:8px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .12s}
+#vie .it{display:flex;align-items:center;gap:8px;padding:8px 12px 8px 6px;min-height:58px}
+#vie .it:active,#vie .cd:active{transform:scale(.985)}
+#vie .nm{flex:1}
+#vie .nm b{display:block;font-weight:600}
+#vie .nm small,#vie .cn small{display:block;color:var(--mute);font-size:13px}
+#vie .dd{flex:none;min-width:70px;text-align:right;padding:4px 10px;border-radius:12px;background:var(--line);color:var(--mute);font-size:14px;white-space:nowrap}
+#vie .dd b{font-size:24px;line-height:1;font-variant-numeric:tabular-nums}
+#vie .dd.good{background:var(--good2);color:var(--good)}
+#vie .dd.mid{background:var(--warn2);color:var(--warn)}
+#vie .dd.bad{background:var(--bad2);color:var(--bad)}
+#vie .add{border:1px dashed var(--line);background:none;border-radius:12px;width:100%;padding:8px;color:var(--mute);font-size:14px;min-height:40px}
+#vie .hint{color:var(--mute);font-size:13px;margin:6px 4px 0}
+#vie .cd{display:flex;align-items:center;gap:10px;padding:6px 12px;min-height:40px;margin:0;border:1px solid var(--line);background:var(--card);border-radius:10px}
+#vie .lab{flex:1;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vie .cdt{color:var(--mute);font-size:14px;white-space:nowrap}
+#vie .big{font-size:16px;font-weight:800;color:var(--acc);font-variant-numeric:tabular-nums;white-space:nowrap;min-width:52px;text-align:right}
+#vie .cd .mini{padding:2px 8px}
+#vie .cd.now{background:color-mix(in srgb,var(--acc) 12%,transparent);border-color:color-mix(in srgb,var(--acc) 30%,transparent)}
+#vie .cd.past{background:color-mix(in srgb,var(--bad) 12%,transparent);border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
+#vie .cd.past .big{color:var(--bad)}
+#vie .cd.now .big{color:var(--acc)}
+#vie .mini{border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:4px 10px;font-size:13px}
+#vie details{margin-top:6px;color:var(--mute);font-size:14px}
+#vie summary{cursor:pointer;padding:6px 4px}
+#vie .fold{cursor:pointer;margin:0}
+#vie #p-rec .pb{display:none;margin-top:10px}
+#vie #p-rec.open .pb{display:block}
+#vie .rh{display:flex;align-items:center;gap:8px;padding:8px 12px 8px 6px;min-height:50px}
+#vie .rh b{flex:1;font-weight:600}
+#vie .chev{color:var(--mute);font-size:13px}
+#vie .rb{padding:0 14px 12px 36px;font-size:15px;user-select:text;-webkit-user-select:text;cursor:auto}
+#vie .rb h4{font-size:13px;color:var(--mute);margin:8px 0 2px}
+#vie .rb ul,#vie .rb ol{margin:0;padding-left:20px}
+#vie .rb li{margin:3px 0}
+#vie .rb a{color:var(--acc);word-break:break-all}
+#vie .muted{color:var(--mute);font-size:14px}
+#vie .tabs{display:none}
+#vie #vtoast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);font-size:14px;padding:9px 14px;border-radius:14px;opacity:0;pointer-events:none;transition:.25s;display:flex;gap:12px;align-items:center;z-index:30;max-width:92vw}
+#vie #vtoast.v{opacity:.95;transform:translateX(-50%);pointer-events:auto}
+#vie #vtoast button{background:none;border:0;color:inherit;font-weight:700;text-decoration:underline;padding:0}
+#vie #vmodal.on{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:16px}
+#vie .ov{position:absolute;inset:0;background:rgba(0,0,0,.4)}
+#vie .sheet{position:relative;background:var(--card);border-radius:18px;padding:18px;width:min(460px,100%);max-height:90vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+#vie .sheet h3{margin:0 0 12px;font-size:19px}
+#vie .sheet label{display:block;font-size:13px;color:var(--mute);font-weight:600;margin:10px 0 4px}
+#vie .sheet input:not([type=checkbox]),#vie .sheet select,#vie .sheet textarea{width:100%;font:inherit;font-size:16px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+#vie .sheet textarea{min-height:90px;resize:vertical}
+#vie .quick{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+#vie .vrow{display:flex;gap:8px;margin-top:18px;align-items:center;flex-wrap:wrap}
+#vie .vrow button,#vie .quick button{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 14px;min-height:42px}
+#vie .quick button{min-height:34px;padding:4px 10px;font-size:14px}
+#vie .vrow .pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+#vie .vrow .danger{color:var(--bad);border-color:var(--bad2)}
+#vie .chk{display:flex!important;gap:8px;align-items:center}
+#vie :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#vie .sortable-ghost{opacity:.35}
+@media(max-width:760px){#vie .wrap{display:block;padding-bottom:96px}
+#vie #vimp{margin-bottom:12px}
+#vie .panel{padding:14px 12px;margin-bottom:12px}
+#vie #p-rec .pb{display:block}
+#vie #p-rec .fold .chev{display:none}
+#vie .tabs{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--card);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+#vie .tabs button{flex:1;border:0;background:none;padding:10px 4px;font-size:14px;font-weight:600;color:var(--mute);border-radius:12px;min-height:48px}
+#vie .tabs button.on{color:var(--acc);background:var(--acc2)}
+#vie #vtoast{bottom:84px}
+#vie .vseg button{font-size:14px;padding:6px 8px}
+#vie #p-rec .ph{flex-wrap:wrap}
+#vie h1{font-size:26px}}
+@media(prefers-reduced-motion:reduce){#vie *{transition:none!important}}
+  /* ================= Harmonisation Vie ↔ Anki : même police, mêmes tailles, mêmes cartes ================= */
+  #vie { font-family:inherit; font-size:14px; line-height:normal; padding:16px clamp(16px,2.5vw,32px) 84px; }
+  #vie .top { display:none; }
+  #vie .wrap { padding:0; gap:14px; }
+  #vie .panel { border:0; border-radius:16px; padding:18px 20px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  #vie .ph { min-height:26px; margin-bottom:12px; }
+  #vie .ph h2 { font-size:12px; font-weight:650; text-transform:uppercase; letter-spacing:.06em; color:var(--mute); }
+  #vie .pen { font-size:11px; opacity:.5; padding:2px 4px; }
+  #vie .vghost { font-size:12px; min-height:28px; padding:4px 9px; border-radius:8px; }
+  #vie .late { font-size:11px; padding:1px 8px; }
+  #vie .cnt { font-size:11px; }
+  #vie .gh, #vie .gh b { font-size:11px; }
+  #vie .vtile { min-height:34px; padding:5px 11px 5px 20px; border-radius:9px; }
+  #vie .vtile.nh { padding-left:11px; }
+  #vie .vtile b { font-size:14px; }
+  #vie .vtile small { font-size:12.5px; }
+  #vie .vtile .mini { font-size:11.5px; }
+  #vie .tadd { min-height:34px; width:40px; font-size:16px; border-radius:9px; }
+  #vie .log div { font-size:11.5px; }
+  #vie .vseg { border-radius:9px; padding:3px; gap:3px; }
+  #vie .vseg button { font-size:12.5px; padding:6px 8px; border-radius:7px; }
+  #vie .sc { margin-left:4px; }
+  #vie .qadd { gap:6px; margin-bottom:8px; }
+  #vie .qadd input { font-size:14px; padding:8px 10px; border-radius:9px; background:var(--bg); }
+  #vie .qbtn { width:auto; padding:0 13px; border-radius:9px; font-size:14px; }
+  #vie .td { min-height:0; padding:8px 2px; gap:10px; }
+  #vie .ck { width:16px; height:16px; border-radius:4px; font-size:10px; }
+  #vie .tn { font-size:14px; line-height:1.35; }
+  #vie .lnkbtn { font-size:12px; padding:2px 4px; }
+  #vie .add { font-size:12.5px; min-height:34px; border-radius:9px; }
+  #vie .rh { min-height:40px; }
+  #vie .rb { font-size:14px; }
+  #vie .rb h4 { font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  #vie .muted { font-size:13px; }
+  #vie .sheet h3 { font-size:15px; }
+  #vie .sheet label { font-size:12px; }
+  #vie .vrow button, #vie .quick button { font-size:13px; }
+  #vie #vtoast { font-size:13px; }
+  @media (max-width: 760px) {
+    #vie .panel { padding:14px; margin-bottom:14px; }
+    #vie #vimp { margin-bottom:14px; }
+  }
+  @media (max-width: 480px) { #vie .panel { margin-bottom:10px; } #vie #vimp { margin-bottom:10px; } }
+
+  /* ================= Fusion : écran Anki puis écran Vie ================= */
+  html, body { height:100%; overflow:hidden; overscroll-behavior:none; }
+  body { display:block; padding:0; }
+  .screen { position:fixed; inset:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; background:var(--bg);
+    transition:transform .85s cubic-bezier(.7,0,.2,1); }
+  #ankiScreen { display:flex; align-items:center; justify-content:center; padding:16px clamp(16px,2.5vw,32px) 58px; }
+  #vie { transform:translateY(100%); }
+  body.onVie #ankiScreen { transform:translateY(-38%); }
+  body.onVie #vie { transform:none; }
+  #thread { position:fixed; inset:0; z-index:22; pointer-events:none; }
+  #thread .paper { position:absolute !important; margin:0 !important; max-height:none !important; overflow:hidden !important; }
+  @media (min-width: 901px) and (min-aspect-ratio: 4/3) {
+    .app { width:100%; height:calc(100vh - 74px); aspect-ratio:auto; }
+  }
+  @media (max-width: 900px), (max-aspect-ratio: 4/3) {
+    body { padding:0; }
+    #ankiScreen { display:block; padding:12px 12px 70px; }
+    #vie { padding:12px 12px 70px; }
+  }
+  /* Important : le même élément, déplié dans la partie Vie */
+  #vie .vlayout { display:grid; grid-template-columns:340px minmax(0,1fr); gap:14px; align-items:start; }
+  #vimpSlot { position:sticky; top:0; min-height:1px; }
+  #vie .wrap { display:block; }
+  #vie .wrap > .panel { margin-bottom:14px; }
+  .paper.inVie { width:100%; max-width:none; max-height:none; overflow:visible; }
+  .paper.inVie.collapsed { padding:14px 14px 16px; width:100%; }
+  .paper.inVie.collapsed .pbody { display:flex; }
+  .paper.inVie .eye { visibility:hidden; }
+  @media (max-width: 760px) {
+    #vie .vlayout { display:block; }
+    #vimpSlot { position:static; margin-bottom:14px; }
+  }
+  #screenSwitch { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); z-index:25; display:flex; gap:3px; padding:3px;
+    border-radius:12px; background:var(--card); box-shadow:0 2px 14px rgba(0,0,0,.16); }
+  #screenSwitch button { border:0; background:none; font:inherit; font-size:13px; font-weight:650; color:var(--muted); padding:7px 18px; border-radius:9px; cursor:pointer; }
+  #screenSwitch button.on { background:var(--accent); color:#fff; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 </head>
 <body>
+<section id="ankiScreen" class="screen">
 <div class="app">
 
     <!-- POMODORO -->
@@ -672,6 +917,12 @@
   </section>
 </div><!-- /bottom-right -->
 </div>
+</section>
+
+<!-- ================= PARTIE VIE ================= -->
+<section id="vie" class="screen"><div class="vlayout"><div id="vimpSlot"></div><div id="vapp"></div></div><div id="vtoast"></div><div id="vmodal"></div></section>
+<div id="thread" aria-hidden="true"></div>
+<nav id="screenSwitch" aria-label="Changer d'écran"><button type="button" data-go="ankiScreen" class="on">Anki</button><button type="button" data-go="vie">Vie</button></nav>
 
 <!-- RÉGLAGES -->
 <div class="dock" id="dock">
@@ -1911,7 +2162,7 @@ async function rpc(fn, args = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
-const DEEP = new Set(["imp", "workMs", "pomoDone", "items", "goals", "pomo", "day"]);
+const DEEP = new Set(["imp", "workMs", "pomoDone", "items", "goals", "pomo", "day", "vie"]);
 const SEP = "\u0001";
 function flat(s) {
   const o = {};
@@ -1930,10 +2181,17 @@ function unflat(f) {
   }
   return s;
 }
+/* JSON à clés triées : Postgres (jsonb) réordonne les clés, on compare donc le contenu, pas l'ordre */
+function canon(j) {
+  const srt = x => Array.isArray(x) ? x.map(srt) : x && typeof x === "object" ? Object.fromEntries(Object.keys(x).sort().map(k => [k, srt(x[k])])) : x;
+  try { return JSON.stringify(srt(JSON.parse(j))); } catch { return j; }
+}
+/* contenu « Vie » par défaut (créé à l'ouverture tant que rien n'est arrivé du cloud) : ce n'est pas une modification de l'utilisateur */
+const isVieDefault = (p, j) => p.startsWith("vie" + SEP) && j !== undefined && !!window.vieDefaults && window.vieDefaults[p.slice(4)] === canon(j);
 function merge3(L, B, R) {
   const out = {};
   for (const p of new Set([...Object.keys(L), ...Object.keys(B), ...Object.keys(R)])) {
-    let v = L[p] !== B[p] ? L[p] : R[p];
+    let v = L[p] !== B[p] && !(B[p] === undefined && R[p] !== undefined && isVieDefault(p, L[p])) ? L[p] : R[p];
     if (p === "pomoLive" && L[p] && R[p] && L[p] !== B[p] && R[p] !== B[p]) v = pickPomo(L[p], R[p]);
     if (v !== undefined) out[p] = v;
   }
@@ -1969,6 +2227,7 @@ function applyState(obj) {
 function renderAll() {
   renderLinks(); renderDayLabels(); renderFam(); renderCalls(); renderPTodo(); applyCollapsed(); applyTheme(); applyToggles();
   renderLists(); tickClock(); fillSettings();
+  if (window.vieRender) window.vieRender();
   loadPomo(); renderPomo();
   if (lastStats) renderAnki(...lastStats);
 }
@@ -2002,7 +2261,7 @@ async function syncNow() {
         if (!/conflict/i.test(e.message)) throw e;
         // un autre appareil a écrit entre-temps : on garde la base « locale vs cloud lu » et on refusionne
         const B = baseStr === null ? (M === L ? {} : R) : JSON.parse(baseStr), nb = {};
-        for (const p of new Set([...Object.keys(B), ...Object.keys(R)])) { const v = L[p] !== B[p] ? B[p] : R[p]; if (v !== undefined) nb[p] = v; }
+        for (const p of new Set([...Object.keys(B), ...Object.keys(R)])) { const v = L[p] !== B[p] && !(B[p] === undefined && R[p] !== undefined && isVieDefault(p, L[p])) ? B[p] : R[p]; if (v !== undefined) nb[p] = v; }
         localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(nb));
         syncAgain = true; return;
       }
@@ -3170,6 +3429,339 @@ setInterval(() => { if (!document.hidden) refresh(); }, 30000);
 initSyncUI(); scheduleSync(300); initPushUI();
 setInterval(() => { if (!document.hidden && syncCfg && !syncBusy) syncNow(); }, 8000);   // le minuteur suit vite sur les autres appareils
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderLists(); renderFam(); renderPeople(); refresh(); } });
+</script>
+<script>
+(() => {"use strict";
+
+const $=s=>document.querySelector(s),app=$('#vapp'),M=$('#vmodal'),T=$('#vtoast');
+const LK='dashboard-vie',DAY=864e5;
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const pd=s=>{const p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2])};
+const today=()=>iso(new Date());
+const diff=(a,b)=>Math.round((pd(a)-pd(b))/DAY);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const fdate=s=>{const d=pd(s),o={weekday:'short',day:'numeric',month:'short'};if(d.getFullYear()!==new Date().getFullYear())o.year='numeric';return d.toLocaleDateString('fr-FR',o)};
+const lines=s=>(s||'').split('\n').map(x=>x.trim()).filter(Boolean);
+
+/* Les données « Vie » vivent dans state.vie du dashboard Anki : enregistrées et synchronisées comme le reste. */
+const VDEF={"since": [{"id": "g0", "name": "", "items": [{"id": "i1", "name": "Changer les draps", "freq": 14, "last": null}]}], "cd": [{"id": "c1", "name": "Noël", "date": "2026-12-25", "arch": false}], "rec": [{"id": "r1", "name": "", "items": [{"id": "x1", "name": "Dahl de lentilles corail", "ing": "200 g de lentilles corail\n1 oignon\n2 gousses d'ail\n1 c. à soupe de curry\n600 ml d'eau\nSel", "steps": "Faire revenir l'oignon et l'ail émincés\nAjouter le curry, puis les lentilles rincées et l'eau\nCuire 20 min à feu doux en remuant, saler", "link": ""}]}], "links": [{"id": "l0", "name": "", "items": []}], "todo": [{"id": "t0", "name": "", "items": []}], "titles": {}};
+const cp=o=>JSON.parse(JSON.stringify(o));
+function S(){
+ if(!state.vie||typeof state.vie!=='object'||Array.isArray(state.vie))state.vie=cp(VDEF);
+ return normVie(state.vie);
+}
+function normVie(v){
+ for(const k of ['since','cd','rec','links','todo'])if(!Array.isArray(v[k]))v[k]=cp(VDEF[k]);
+ v.titles=Object.assign({since:'Temps depuis',cd:'Compte à rebours',rec:'Recettes',links:'Liens utiles',todo:'To-do'},v.titles||{});
+ ['todo','rec','links'].forEach(k=>{if(v[k].length!==1||v[k][0].name){const all=[];v[k].forEach(g=>all.push(...(g.items||[])));v[k]=[{id:(v[k][0]||{}).id||uid(),name:'',items:all}]}});
+ if(!v.since.length)v.since.push({id:uid(),name:'',items:[]});
+ return v;
+}
+{const d=normVie(cp(VDEF));window.vieDefaults={};for(const k of Object.keys(d))window.vieDefaults[k]=canon(JSON.stringify(d[k]));}
+const TT=k=>esc(S().titles[k]);
+const hm=t=>{const d=new Date(t);return d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
+const pen=v=>`<button class="pen" data-a="edit" data-v="${v}" aria-label="Modifier">✎</button>`;
+let ui={tab:'since',rec:false,shut:{},open:{},rmode:'todo',ledit:false};
+try{const u=JSON.parse(localStorage.getItem(LK+'-ui')||'null');if(u)ui=Object.assign(ui,u)}catch(e){}
+const saveUi=()=>{try{localStorage.setItem(LK+'-ui',JSON.stringify(ui))}catch(e){}};
+function findIt(gs,id){for(const g of gs){const i=g.items.findIndex(x=>x.id===id);if(i>=0)return[g,i]}return[null,-1]}
+
+function grp(kind,g,inner,after){
+ const sh=!!ui.shut[g.id],tl=kind==='since'||kind==='links';
+ return `<div class="grp" data-g="${g.id}"><div class="gh${g.name?'':' nog'}" data-tap="gtog" data-edit="g-${kind}:${g.id}"><span class="ghd" aria-label="Déplacer le groupe">⠿</span><b>${esc(g.name)}</b>${pen('g-'+kind+':'+g.id)}<span class="cnt">${g.items.length}</span><span class="chev">${sh?'▸':'▾'}</span></div><div class="list${tl?' tiles':''}${kind==='todo'?' tdl':''}${sh?' shut':''}" data-list="${kind}">${inner}${tl?`<button class="tadd" data-a="add-${kind}" data-v="${g.id}" aria-label="Ajouter">+</button>`:''}</div>${sh?'':(after!=null?after:(tl?'':`<button class="add" data-a="add-${kind}" data-v="${g.id}">+ Ajouter</button>`))}</div>`;
+}
+function vSince(){
+ const t=today();let late=0;
+ const gs=S().since.map(g=>{
+  const tiles=g.items.map(it=>{
+   const d=it.last?diff(t,it.last):null;let c='';
+   if(d!==null&&it.freq){const r=d/it.freq;c=r>=1?'bad':r>=.75?'mid':'good';if(r>=1)late++}
+   return `<div class="vtile ${c}" data-id="${it.id}" data-tap="reset" data-edit="since:${it.id}" title="${it.freq?'Tous les '+it.freq+' j':''}"><span class="hd" aria-label="Déplacer">⠿</span><b>${esc(it.name)}</b><small>${d===null?'–':'J'+d}${it.freq?'<span class="fq"> / '+it.freq+'</span>':''}</small></div>`}).join('');
+  const lg=g.items.filter(i=>i.last).sort((x,y)=>(y.at||+pd(y.last))-(x.at||+pd(x.last))).slice(0,3);
+  return grp('since',g,tiles,lg.length?'<div class="log">'+lg.map(i=>`<div><span>${esc(i.name)}</span><span>${i.at&&iso(new Date(i.at))===i.last?hm(i.at):fdate(i.last)}</span></div>`).join('')+'</div>':'');
+ }).join('');
+ return `<section class="panel${ui.tab==='since'?' act':''}" id="p-since"><div class="ph"><h2>${TT('since')}</h2>${pen('title:since')}${late?`<span class="late">${late} en retard</span>`:''}<button class="vghost" data-a="addg-since">+ Groupe</button></div><div data-glist="since">${gs}</div></section>`;
+}
+function human(n){if(n>=60)return'≈ '+Math.round(n/30.44)+' mois';if(n>=14)return Math.floor(n/7)+' sem.'+(n%7?' et '+n%7+' j':'');return''}
+function cdCard(c,t){
+ const n=diff(c.date,t),big=n>0?'J-'+n:n===0?'Jour J':'J+'+(-n),h=n>0?human(n):'';
+ return `<div class="vtile nh${c.arch?'':n<0?' past':n===0?' now':''}" data-tap="none" data-edit="cd:${c.id}" title="${fdate(c.date)}${h?' · '+h:''}"><b>${esc(c.name)}</b>${n<0&&!c.arch?`<button class="mini" data-a="arch" data-v="${c.id}">Archiver</button>`:''}<small class="cj">${big}</small></div>`;
+}
+function vCd(){
+ const t=today(),srt=a=>a.slice().sort((x,y)=>x.date<y.date?-1:1);
+ const act=srt(S().cd.filter(c=>!c.arch)),ar=srt(S().cd.filter(c=>c.arch));
+ return `<section class="panel${ui.tab==='cd'?' act':''}" id="p-cd"><div class="ph"><h2>${TT('cd')}</h2>${pen('title:cd')}</div><div class="tiles">${act.map(c=>cdCard(c,t)).join('')}<button class="tadd" data-a="add-cd" aria-label="Ajouter une date">+</button></div>${ar.length?`<details><summary>Archivées (${ar.length})</summary><div class="tiles">${ar.map(c=>cdCard(c,t)).join('')}</div></details>`:''}</section>`;
+}
+function vLinks(){
+ return S().links.map(g=>grp('links',g,g.items.map(l=>ui.ledit
+  ?`<div class="vtile ed" data-id="${l.id}" data-tap="ed" data-edit="links:${l.id}"><span class="hd" aria-label="Déplacer">⠿</span><b>${esc(l.name)}</b><small>✎</small></div>`
+  :`<a class="vtile nh lnk" data-id="${l.id}" href="${esc(l.url)}" target="_blank" rel="noopener" data-edit="links:${l.id}" title="${esc(l.url)}"><b>${esc(l.name)}</b><small>↗</small></a>`).join(''))).join('');
+}
+function vTodo(){
+ const g=S().todo[0];
+ return `<div class="grp" data-g="${g.id}"><form class="qadd" data-g="${g.id}"><input placeholder="Ajouter une tâche" aria-label="Ajouter une tâche" enterkeyhint="done"><button class="qbtn" aria-label="Ajouter">+</button></form><div class="list tdl" data-list="todo">${g.items.map(t=>`<div class="td${t.done?' vdone':''}" data-id="${t.id}" data-tap="tdo" data-edit="todo:${t.id}"><span class="ck">${t.done?'✓':''}</span><span class="tn">${esc(t.name)}</span><span class="hd" aria-label="Déplacer">⠿</span></div>`).join('')}</div></div>`;
+}
+function vRec(){
+ const m=['todo','rec','links'].includes(ui.rmode)?ui.rmode:'todo',n=S()[m].reduce((a,g)=>a+g.items.filter(i=>!i.done).length,0);
+ const nd=m==='todo'?S().todo.reduce((a,g)=>a+g.items.filter(i=>i.done).length,0):0;
+ const gs=m==='todo'?vTodo():m==='links'?vLinks():S().rec.map(g=>grp('rec',g,g.items.map(r=>{
+  const op=ui.open[r.id],ing=lines(r.ing),stp=lines(r.steps),ok=/^https?:\/\//i.test(r.link||'');
+  const body=op?`<div class="rb">${ing.length?'<h4>Ingrédients</h4><ul>'+ing.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':''}${stp.length?'<h4>Étapes</h4><ol>'+stp.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>':''}${ok?`<h4>Lien</h4><a href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.link)}</a>`:''}${!ing.length&&!stp.length&&!ok?'<p class="muted">Pas encore de détails : double-clic ou appui long pour compléter.</p>':''}</div>`:'';
+  return `<div class="rc" data-id="${r.id}" data-tap="rtog" data-edit="rec:${r.id}"><div class="rh"><span class="hd" aria-label="Déplacer">⠿</span><b>${esc(r.name)}</b><span class="chev">${op?'▾':'▸'}</span></div>${body}</div>`}).join(''))).join('');
+ const bar=(nd?`<button class="lnkbtn" data-a="clrdone">Effacer les éléments cochés</button>`:'')+(m==='links'?`<button class="vghost${ui.ledit?' on':''}" data-a="ledit">${ui.ledit?'Terminé':'Modifier les liens'}</button>`:'');
+ const cnt={todo:S().todo[0].items.filter(i=>!i.done).length,rec:S().rec[0].items.length,links:S().links[0].items.length};
+ return `<section class="panel${ui.rec?' open':''}${ui.tab==='rec'?' act':''}" id="p-rec"><div class="ph fold" data-a="recfold"><div class="vseg">${['todo','rec','links'].map(k=>`<button data-a="rmode" data-v="${k}" data-edit="title:${k}" class="${m===k?'on':''}">${TT(k)}${cnt[k]?`<span class="sc">${cnt[k]}</span>`:''}</button>`).join('')}</div><span class="chev">${ui.rec?'▾':'▸'}</span></div><div class="pb"><div data-glist="${m}">${gs}</div>${bar?`<div class="bar2${m==='todo'?' r':''}">${bar}</div>`:''}</div></section>`;
+}
+function render(){
+ const VS=document.getElementById('vie'),y=VS.scrollTop,ae=document.activeElement,qv=ae&&ae.closest&&ae.closest('#vapp .qadd')?ae.value:null;
+ app.innerHTML=`<div class="wrap">${vSince()}${vCd()}${vRec()}</div>`;
+ if(qv!==null){const ni=app.querySelector('.qadd input');if(ni){ni.value=qv;ni.focus()}}
+ VS.scrollTop=y;sortables();
+}
+let dragging=false;
+function sortables(){
+ if(!window.Sortable)return;
+ const o=k=>({animation:150,fallbackTolerance:4,onStart:()=>{dragging=true},onEnd:()=>{dragging=false;rebuild(k)}});
+ app.querySelectorAll('[data-list]').forEach(l=>Sortable.create(l,Object.assign(o(l.dataset.list),{group:l.dataset.list,handle:'.hd',draggable:{rec:'.rc',todo:'.td'}[l.dataset.list]||'.vtile'})));
+ app.querySelectorAll('[data-glist]').forEach(l=>Sortable.create(l,Object.assign(o(l.dataset.glist),{handle:'.ghd'})));
+}
+function rebuild(k){
+ const all={},byG={};S()[k].forEach(g=>{byG[g.id]=g;g.items.forEach(i=>{all[i.id]=i})});
+ S()[k]=[...app.querySelectorAll(`[data-glist="${k}"] > .grp`)].map(el=>{const g=byG[el.dataset.g];g.items=[...el.querySelector('.list').children].map(c=>all[c.dataset.id]).filter(Boolean);return g});
+ changed();
+}
+
+let undoFn=null,tt=null;
+function toast(msg,undo){
+ T.innerHTML='<span>'+esc(msg)+'</span>'+(undo?'<button>Annuler</button>':'');T.className='v';undoFn=undo||null;clearTimeout(tt);
+ tt=setTimeout(()=>{T.className='';undoFn=null},undo?5000:1800);
+}
+T.addEventListener('click',e=>{if(e.target.tagName==='BUTTON'&&undoFn){const f=undoFn;undoFn=null;T.className='';f()}});
+
+let modalOpen=false;
+function opts(gs,sel){return gs.map(g=>`<option value="${g.id}"${g.id===sel?' selected':''}>${g.name?esc(g.name):'Sans groupe'}</option>`).join('')}
+function openForm(kind,id,gid){
+ let f='',title='',x={};
+ if(kind==='since'||kind==='rec'||kind==='links'||kind==='todo'){const[g,i]=findIt(S()[kind],id);if(g){x=g.items[i];gid=g.id}}
+ if(kind==='cd')x=S().cd.find(c=>c.id===id)||{};
+ if(kind.startsWith('g-'))x=S()[kind.slice(2)].find(g=>g.id===id)||{};
+ if(kind==='since'){title=id?'Modifier':'Nouvel élément';f=`<label for="f-name">Nom</label><input id="f-name" required value="${esc(x.name)}"><label for="f-g">Groupe</label><select id="f-g">${opts(S().since,gid)}</select><label for="f-freq">Fréquence cible (jours, facultatif)</label><input id="f-freq" type="number" min="1" inputmode="numeric" placeholder="ex. 14" value="${x.freq||''}"><label for="f-last">Dernière fois</label><input id="f-last" type="date" max="${today()}" value="${x.last||''}"><div class="quick"><button type="button" data-a="setd" data-v="0">Aujourd'hui</button><button type="button" data-a="setd" data-v="1">Hier</button><button type="button" data-a="setd" data-v="2">Avant-hier</button><button type="button" data-a="setd" data-v="-1">Jamais</button></div>`}
+ if(kind==='rec'){title=id?'Modifier la recette':'Nouvelle recette';f=`<label for="f-name">Titre</label><input id="f-name" required value="${esc(x.name)}"><label for="f-ing">Ingrédients (un par ligne)</label><textarea id="f-ing">${esc(x.ing)}</textarea><label for="f-steps">Étapes (une par ligne)</label><textarea id="f-steps">${esc(x.steps)}</textarea><label for="f-link">Lien (facultatif)</label><input id="f-link" type="url" placeholder="https://" value="${esc(x.link)}">`}
+ if(kind==='cd'){title=id?'Modifier la date':'Nouvelle date';f=`<label for="f-name">Nom</label><input id="f-name" required placeholder="ex. Vacances" value="${esc(x.name)}"><label for="f-date">Date</label><input id="f-date" type="date" required value="${x.date||today()}">${id?`<label class="chk"><input id="f-arch" type="checkbox"${x.arch?' checked':''}> Archivée</label>`:''}`}
+ if(kind==='todo'){title=id?'Modifier la tâche':'Nouvelle tâche';f=`<label for="f-name">Tâche</label><input id="f-name" required value="${esc(x.name)}">`}
+ if(kind==='links'){title=id?'Modifier le lien':'Nouveau lien';f=`<label for="f-name">Nom</label><input id="f-name" required placeholder="ex. Ameli" value="${esc(x.name)}"><label for="f-url">Adresse</label><input id="f-url" required type="text" inputmode="url" autocapitalize="off" placeholder="ex. ameli.fr" value="${esc(x.url)}">`}
+ if(kind==='title'){title='Renommer le bloc';f=`<label for="f-name">Titre</label><input id="f-name" required value="${TT(id)}">`}
+ if(kind.startsWith('g-')){title=id?'Renommer le groupe':'Nouveau groupe';f=`<label for="f-name">Nom du groupe</label><input id="f-name" required value="${esc(x.name)}">`}
+ M.className='on';modalOpen=true;
+ M.innerHTML=`<div class="ov" data-a="close"></div><form class="sheet" data-k="${kind}" data-id="${id||''}" data-g="${gid||''}"><h3>${title}</h3>${f}<div class="vrow">${id&&kind!=='title'&&!(kind==='fam'&&!imp.famDates[+id])?'<button type="button" class="danger" data-a="del">Supprimer</button>':''}<span style="flex:1"></span><button type="button" data-a="close">Annuler</button><button class="pri">Enregistrer</button></div></form>`;
+ const n=$('#f-name');if(n&&!id)n.focus();
+ const fl=$('#f-last');if(fl)fl.addEventListener('focus',()=>{if(!fl.value)fl.value=today()});
+}
+function closeForm(){M.className='';M.innerHTML='';modalOpen=false}
+M.addEventListener('click',e=>{
+ const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,fm=M.querySelector('form');
+ if(a==='close')closeForm();
+ if(a==='setd'){const v=+b.dataset.v;$('#f-last').value=v<0?'':iso(new Date(Date.now()-v*DAY))}
+ if(a==='del'){
+  const k=fm.dataset.k,id=fm.dataset.id;
+  if(!b.dataset.ok){const g=k.startsWith('g-')&&S()[k.slice(2)].find(x=>x.id===id);b.dataset.ok=1;b.textContent=g&&g.items.length?`Confirmer (+ ${g.items.length} élément${g.items.length>1?'s':''})`:'Confirmer ?';return}
+  if(k==='cd')S().cd=S().cd.filter(c=>c.id!==id);
+  else if(k.startsWith('g-'))S()[k.slice(2)]=S()[k.slice(2)].filter(g=>g.id!==id);
+  else{const[g,i]=findIt(S()[k],id);if(g)g.items.splice(i,1)}
+  closeForm();changed();toast('Supprimé');
+ }
+});
+M.addEventListener('submit',e=>{
+ e.preventDefault();const fm=e.target,k=fm.dataset.k,id=fm.dataset.id,v=s=>{const el=$(s);return el?el.value.trim():''};
+ const name=v('#f-name');if(!name)return;
+ if(k==='since'||k==='rec'||k==='links'||k==='todo'){
+  const ng=S()[k].find(x=>x.id===v('#f-g'))||(g0=>g0)(findIt(S()[k],id)[0]||S()[k][0]);if(!ng)return;
+  let it;const[g,i]=findIt(S()[k],id);
+  if(g){it=g.items[i];if(g!==ng){g.items.splice(i,1);ng.items.push(it)}}
+  else{it={id:uid()};ng.items.push(it)}
+  it.name=name;
+  if(k==='since'){it.freq=parseInt(v('#f-freq'))||null;const nl=v('#f-last')||null;if(nl!==it.last){it.last=nl;it.at=null}}
+  else if(k==='todo'){}
+  else if(k==='links'){let u=v('#f-url');if(u&&!/^[a-z]+:\/\//i.test(u))u='https://'+u;it.url=u}
+  else{it.ing=$('#f-ing').value;it.steps=$('#f-steps').value;it.link=v('#f-link')}
+ }
+ if(k==='title')S().titles[id]=name;
+ if(k==='cd'){const date=v('#f-date');if(!date)return;let c=S().cd.find(x=>x.id===id);if(!c){c={id:uid(),arch:false};S().cd.push(c)}c.name=name;c.date=date;const ar=$('#f-arch');if(ar)c.arch=ar.checked}
+ if(k.startsWith('g-')){const gs=S()[k.slice(2)];let g=gs.find(x=>x.id===id);if(!g){g={id:uid(),items:[]};gs.push(g)}g.name=name}
+ closeForm();changed();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalOpen)closeForm()});
+
+function tap(kind,el){
+ if(kind==='reset'){
+  const id=el.dataset.id,[g,i]=findIt(S().since,id);if(!g)return;const it=g.items[i],prev=it.last,pat=it.at;
+  if(prev===today()){toast('Déjà noté aujourd\'hui');return}
+  it.last=today();it.at=Date.now();changed();
+  toast('« '+it.name+' » remis à 0',()=>{const[g2,i2]=findIt(S().since,id);if(g2){g2.items[i2].last=prev;g2.items[i2].at=pat;changed()}});
+ }
+ if(kind==='ed')edit(el.dataset.edit);
+ if(kind==='tdo'){const[g,i]=findIt(S().todo,el.dataset.id);if(g){g.items[i].done=!g.items[i].done;changed()}}
+ if(kind==='rtog'){ui.open[el.dataset.id]=!ui.open[el.dataset.id];saveUi();render()}
+ if(kind==='gtog'){const gid=el.closest('.grp').dataset.g;ui.shut[gid]=!ui.shut[gid];saveUi();render()}
+}
+function edit(s){const p=s.split(':');openForm(p[0],p[1])}
+function act(a,v){
+ if(a==='edit'){edit(v);return}
+ if(a==='tab'){ui.tab=v;saveUi();render();window.scrollTo(0,0)}
+ if(a==='add-since'||a==='add-links'){const k=a.slice(4);if(!S()[k].length)S()[k].push({id:uid(),name:'',items:[]});openForm(k,null,v||S()[k][0].id)}
+ if(a==='add-rec')openForm('rec',null,v);
+ if(a==='add-cd')openForm('cd');
+ if(a==='addg-since')openForm('g-since');
+ if(a==='addg-rec')openForm('g-rec');
+ if(a==='addg-links')openForm('g-links');
+ if(a==='addg-todo')openForm('g-todo');
+ if(a==='add-todo'){const i=app.querySelector('.qadd input');if(i)i.focus()}
+ if(a==='clrdone'){const prev=JSON.stringify(S().todo);S().todo.forEach(g=>{g.items=g.items.filter(i=>!i.done)});changed();toast('Tâches cochées effacées',()=>{S().todo=JSON.parse(prev);changed()})}
+ if(a==='rmode'){ui.rmode=v;ui.rec=true;saveUi();render()}
+ if(a==='ledit'){ui.ledit=!ui.ledit;saveUi();render()}
+ if(a==='recfold'){ui.rec=!ui.rec;saveUi();render()}
+ if(a==='arch'){const c=S().cd.find(x=>x.id===v);if(c){c.arch=true;changed();toast('Archivée',()=>{c.arch=false;changed()})}}
+}
+
+app.addEventListener('submit',e=>{
+ const f=e.target.closest('.qadd');if(!f)return;e.preventDefault();
+ const inp=f.querySelector('input'),t=inp.value.trim(),g=S().todo.find(x=>x.id===f.dataset.g);if(!t||!g)return;
+ g.items.push({id:uid(),name:t,done:false});changed();
+ const ni=app.querySelector(`.qadd[data-g="${g.id}"] input`);if(ni)ni.focus();
+});
+let lp=null,lpFired=false,pend=null;
+const clearLp=()=>{if(lp){clearTimeout(lp.t);lp=null}};
+app.addEventListener('pointerdown',e=>{
+ const el=e.target.closest('[data-edit]');if(!el||e.target.closest('.hd,.ghd,button:not([data-edit]),.rb'))return;
+ lpFired=false;clearLp();
+ lp={x:e.clientX,y:e.clientY,t:setTimeout(()=>{lp=null;lpFired=true;if(pend){clearTimeout(pend.t);pend=null}try{navigator.vibrate&&navigator.vibrate(15)}catch(_){}edit(el.dataset.edit)},550)};
+});
+app.addEventListener('pointermove',e=>{if(lp&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>10)clearLp()});
+['pointerup','pointercancel'].forEach(t=>app.addEventListener(t,clearLp));
+app.addEventListener('contextmenu',e=>{const el=e.target.closest('[data-edit]');if(!el)return;e.preventDefault();if(el.matches('.lnk,.vseg button')&&e.pointerType!=='touch'&&!lpFired&&!lp)edit(el.dataset.edit)});
+app.addEventListener('click',e=>{
+ if(lpFired){lpFired=false;e.preventDefault();return}
+ const b=e.target.closest('[data-a]');if(b){act(b.dataset.a,b.dataset.v);return}
+ if(e.target.closest('.hd,.ghd,a,.rb'))return;
+ const el=e.target.closest('[data-tap]');if(!el)return;
+ if(pend&&pend.el===el){clearTimeout(pend.t);pend=null;edit(el.dataset.edit);return}
+ if(pend){clearTimeout(pend.t);pend.fn()}
+ const fn=()=>{pend=null;tap(el.dataset.tap,el)};
+ pend={el,fn,t:setTimeout(fn,260)};
+});
+
+function changed(){
+ try{save()}catch(e){}
+ render();
+}
+window.vieRender=()=>{if(!modalOpen&&!dragging)render()};
+render();
+setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
+
+})();
+
+/* ================= Téléportation Anki ⇄ Vie =================
+   Deux écrans fixes. Un petit glissement (molette, pavé tactile, doigt) au bord d'un écran envoie à l'autre.
+   « Important » est le même élément dans les deux écrans : pendant le passage il flotte au-dessus (#thread),
+   glisse moins loin que les écrans (parallaxe) et se déplie jusqu'à sa place dans la partie Vie. */
+(() => {
+  const A = document.getElementById("ankiScreen"), V = document.getElementById("vie");
+  const P = document.getElementById("paper"), slot = document.getElementById("vimpSlot"), thread = document.getElementById("thread");
+  const app = document.querySelector(".app"), sw = document.getElementById("screenSwitch");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+  let onVie = false, busy = false, needQuiet = false, lastWheel = 0, gesture = null;
+
+  const placeInVie = () => { P.classList.add("inVie"); slot.appendChild(P); };
+  const placeInAnki = () => { P.classList.remove("inVie"); app.insertBefore(P, app.querySelector(".bottom-right")); try { applyCollapsed(); } catch {} };
+  const modalOpen = () => document.querySelector("#vmodal.on, .modal.open, .scanbox:not([hidden])");
+  const cur = () => onVie ? V : A;
+  const atEdge = dir => { const el = cur(); return dir > 0 ? el.scrollTop + el.clientHeight >= el.scrollHeight - 2 : el.scrollTop <= 1; };
+  /* un élément intérieur (liste, feuille…) peut-il encore défiler dans ce sens ? */
+  function innerScroll(t, dir) {
+    for (let el = t; el && el !== A && el !== V && el !== document.body; el = el.parentElement) {
+      if (el.scrollHeight > el.clientHeight + 1) {
+        const oy = getComputedStyle(el).overflowY;
+        if ((oy === "auto" || oy === "scroll") && (dir > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0)) return true;
+      }
+    }
+    return false;
+  }
+  const setSwitch = () => sw.querySelectorAll("button").forEach(b => b.classList.toggle("on", (b.dataset.go === "vie") === onVie));
+
+  function go(toVie) {
+    if (busy || toVie === onVie) return;
+    busy = true; needQuiet = true;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    const from = P.getBoundingClientRect(), tgt = toVie ? V : A;
+    if (toVie) { V.scrollTop = 0; placeInVie(); } else placeInAnki();
+    const tr = tgt.getBoundingClientRect(), pr = P.getBoundingClientRect();
+    const to = { left: pr.left - tr.left, top: pr.top - tr.top, width: pr.width, height: pr.height };
+    /* l'élément quitte son écran et flotte au-dessus des deux pendant le passage */
+    P.classList.add("inVie", "flying");
+    thread.appendChild(P);
+    Object.assign(P.style, { left: from.left + "px", top: from.top + "px", width: from.width + "px", height: from.height + "px" });
+    onVie = toVie; setSwitch();
+    document.body.classList.toggle("onVie", toVie);
+    const land = () => {
+      if (!busy) return;
+      P.removeAttribute("style"); P.classList.remove("flying");
+      if (toVie) placeInVie(); else placeInAnki();
+      busy = false;
+    };
+    if (reduce.matches || !P.animate) { land(); return; }
+    const box = (r, k, sh) => ({ left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", transform: `scale(${k})`, boxShadow: sh });
+    const flat = "0 1px 3px rgba(0,0,0,.08)";
+    const midR = { left: (from.left + to.left) / 2, top: (from.top + to.top) / 2, width: (from.width + to.width) / 2, height: (from.height + to.height) / 2 };
+    const anim = P.animate([box(from, 1, flat), Object.assign(box(midR, 1.04, "0 24px 50px rgba(40,30,0,.30)"), { offset: .5 }), box(to, 1, flat)],
+      { duration: 900, easing: "cubic-bezier(.45,0,.2,1)", fill: "forwards" });
+    anim.onfinish = () => { land(); anim.cancel(); };
+    setTimeout(() => { try { anim.cancel(); } catch {} land(); }, 1600);
+  }
+  window.screenGo = go;
+
+  /* molette / pavé tactile : un geste = un passage, s'il a commencé au bord de l'écran */
+  addEventListener("wheel", e => {
+    if (modalOpen() || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+    const now = Date.now(), fresh = now - lastWheel > 280; lastWheel = now;
+    if (busy) { e.preventDefault(); return; }
+    if (fresh) { needQuiet = false; gesture = { down: !onVie && atEdge(1), up: onVie && atEdge(-1) }; }
+    if (needQuiet || !gesture) return;
+    const dir = Math.sign(e.deltaY); if (!dir) return;
+    if (innerScroll(e.target, dir)) return;
+    if (dir > 0 && gesture.down) { e.preventDefault(); go(true); }
+    else if (dir < 0 && gesture.up) { e.preventDefault(); go(false); }
+  }, { passive: false });
+
+  /* doigt : un petit glissement vertical au bord suffit */
+  let t0 = null;
+  addEventListener("touchstart", e => {
+    t0 = null;
+    if (busy || modalOpen() || e.touches.length > 1) return;
+    const t = e.target;
+    if (t.closest && t.closest(".hd,.ghd,.grip,.vtrack,input,textarea,select,.person")) return;
+    t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY,
+      down: !onVie && atEdge(1) && !innerScroll(t, 1), up: onVie && atEdge(-1) && !innerScroll(t, -1) };
+  }, { passive: true });
+  addEventListener("touchmove", e => {
+    if (!t0) return;
+    const dy = t0.y - e.touches[0].clientY, dx = t0.x - e.touches[0].clientX;
+    if (Math.abs(dx) > Math.abs(dy)) return;
+    if ((dy > 0 && t0.down) || (dy < 0 && t0.up)) {
+      if (e.cancelable) e.preventDefault();
+      if (Math.abs(dy) > 28) { const v = dy > 0; t0 = null; go(v); }
+    }
+  }, { passive: false });
+  addEventListener("touchend", () => { t0 = null; });
+
+  addEventListener("keydown", e => {
+    if (modalOpen() || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "")) return;
+    if ((e.key === "PageDown" || e.key === "ArrowDown") && !onVie && atEdge(1)) { e.preventDefault(); go(true); }
+    if ((e.key === "PageUp" || e.key === "ArrowUp") && onVie && atEdge(-1)) { e.preventDefault(); go(false); }
+  });
+  sw.addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) go(b.dataset.go === "vie"); });
+  setSwitch();
+})();
 </script>
 </body>
 </html>
