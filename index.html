@@ -3540,7 +3540,9 @@ function normVie(v){
  v.titles=Object.assign({since:'Temps depuis',cd:'Compte à rebours',rec:'Recettes',links:'Liens utiles',todo:'To-do'},v.titles||{});
  ['todo','rec','links'].forEach(k=>{if(v[k].length!==1||v[k][0].name){const all=[];v[k].forEach(g=>all.push(...(g.items||[])));v[k]=[{id:(v[k][0]||{}).id||uid(),name:'',items:all}]}});
  if(!v.since.length)v.since.push({id:uid(),name:'',items:[]});
- v.since.forEach(g=>(g.items||[]).forEach(i=>{if(i.cdDays===undefined&&/^mph\s*pres/i.test(i.name||''))i.cdDays=28}));
+ v.since.forEach(g=>(g.items||[]).forEach(i=>{if(i.cdDays!==undefined)return;
+  if(/^mph\s*pres/i.test(i.name||''))i.cdDays=28;
+  else if(/^machine\s*(de|à|a)?\s*linge/i.test(i.name||'')){i.cdDays=2;i.cdName='Étendre le linge'}}));
  return v;
 }
 {const d=normVie(cp(VDEF));window.vieDefaults={};for(const k of Object.keys(d))window.vieDefaults[k]=canon(JSON.stringify(d[k]));}
@@ -3572,12 +3574,12 @@ function vSince(){
 function human(n){if(n>=60)return'≈ '+Math.round(n/30.44)+' mois';if(n>=14)return Math.floor(n/7)+' sem.'+(n%7?' et '+n%7+' j':'');return''}
 function cdCard(c,t){
  const n=diff(c.date,t),big=n>0?'J-'+n:n===0?'Jour J':'J+'+(-n),h=n>0?human(n):'';
- const tip=fdate(c.date)+(h?' · '+h:'')+(c.auto?` · automatique : ${c.days} j après « ${c.name} » (${fdate(c.from)})`:'');
+ const tip=fdate(c.date)+(h?' · '+h:'')+(c.auto?` · automatique : ${c.days} j après « ${c.src} » (${fdate(c.from)})`:'');
  return `<div class="vtile nh${c.arch?'':n<0?' past':n===0?' now':''}" data-tap="none" data-edit="${c.auto?'since:'+c.auto:'cd:'+c.id}" title="${esc(tip)}"><b>${esc(c.name)}</b>${n<0&&!c.arch&&!c.auto?`<button class="mini" data-a="arch" data-v="${c.id}">Archiver</button>`:''}<small class="cj">${big}</small></div>`;
 }
 const addDays=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return iso(d)};
 /* comptes à rebours automatiques : un élément de « Temps depuis » avec un délai (ex. MPH press, 28 j) */
-const autoCd=()=>S().since.flatMap(g=>g.items.filter(i=>i.cdDays>0&&i.last).map(i=>({id:'auto-'+i.id,auto:i.id,name:i.name,days:i.cdDays,from:i.last,date:addDays(i.last,i.cdDays),arch:false})));
+const autoCd=()=>S().since.flatMap(g=>g.items.filter(i=>i.cdDays>0&&i.last).map(i=>({id:'auto-'+i.id,auto:i.id,name:i.cdName||i.name,src:i.name,days:i.cdDays,from:i.last,date:addDays(i.last,i.cdDays),arch:false})));
 function vCd(){
  const t=today(),srt=a=>a.slice().sort((x,y)=>x.date<y.date?-1:1);
  const act=srt(S().cd.filter(c=>!c.arch).concat(autoCd())),ar=srt(S().cd.filter(c=>c.arch));
@@ -3642,7 +3644,7 @@ function openForm(kind,id,gid){
  if(kind==='since'||kind==='rec'||kind==='links'||kind==='todo'){const[g,i]=findIt(S()[kind],id);if(g){x=g.items[i];gid=g.id}}
  if(kind==='cd')x=S().cd.find(c=>c.id===id)||{};
  if(kind.startsWith('g-'))x=S()[kind.slice(2)].find(g=>g.id===id)||{};
- if(kind==='since'){title=id?'Modifier':'Nouvel élément';f=`<label for="f-name">Nom</label><input id="f-name" required value="${esc(x.name)}"><label for="f-g">Groupe</label><select id="f-g">${opts(S().since,gid)}</select><label for="f-freq">Fréquence cible (jours, facultatif)</label><input id="f-freq" type="number" min="1" inputmode="numeric" placeholder="ex. 14" value="${x.freq||''}"><label for="f-cd">Compte à rebours après la dernière fois (jours, facultatif)</label><input id="f-cd" type="number" min="1" inputmode="numeric" placeholder="ex. 28" value="${x.cdDays||''}"><label for="f-last">Dernière fois</label><input id="f-last" type="date" max="${today()}" value="${x.last||''}"><div class="quick"><button type="button" data-a="setd" data-v="0">Aujourd'hui</button><button type="button" data-a="setd" data-v="1">Hier</button><button type="button" data-a="setd" data-v="2">Avant-hier</button><button type="button" data-a="setd" data-v="-1">Jamais</button></div>`}
+ if(kind==='since'){title=id?'Modifier':'Nouvel élément';f=`<label for="f-name">Nom</label><input id="f-name" required value="${esc(x.name)}"><label for="f-g">Groupe</label><select id="f-g">${opts(S().since,gid)}</select><label for="f-freq">Fréquence cible (jours, facultatif)</label><input id="f-freq" type="number" min="1" inputmode="numeric" placeholder="ex. 14" value="${x.freq||''}"><label for="f-cd">Compte à rebours après la dernière fois (jours, facultatif)</label><input id="f-cd" type="number" min="1" inputmode="numeric" placeholder="ex. 28" value="${x.cdDays||''}"><label for="f-cdname">Nom du compte à rebours (facultatif)</label><input id="f-cdname" placeholder="${esc(x.name||'même nom')}" value="${esc(x.cdName||'')}"><label for="f-last">Dernière fois</label><input id="f-last" type="date" max="${today()}" value="${x.last||''}"><div class="quick"><button type="button" data-a="setd" data-v="0">Aujourd'hui</button><button type="button" data-a="setd" data-v="1">Hier</button><button type="button" data-a="setd" data-v="2">Avant-hier</button><button type="button" data-a="setd" data-v="-1">Jamais</button></div>`}
  if(kind==='rec'){title=id?'Modifier la recette':'Nouvelle recette';f=`<label for="f-name">Titre</label><input id="f-name" required value="${esc(x.name)}"><label for="f-ing">Ingrédients (un par ligne)</label><textarea id="f-ing">${esc(x.ing)}</textarea><label for="f-steps">Étapes (une par ligne)</label><textarea id="f-steps">${esc(x.steps)}</textarea><label for="f-link">Lien (facultatif)</label><input id="f-link" type="url" placeholder="https://" value="${esc(x.link)}">`}
  if(kind==='cd'){title=id?'Modifier la date':'Nouvelle date';f=`<label for="f-name">Nom</label><input id="f-name" required placeholder="ex. Vacances" value="${esc(x.name)}"><label for="f-date">Date</label><input id="f-date" type="date" required value="${x.date||today()}">${id?`<label class="chk"><input id="f-arch" type="checkbox"${x.arch?' checked':''}> Archivée</label>`:''}`}
  if(kind==='todo'){title=id?'Modifier la tâche':'Nouvelle tâche';f=`<label for="f-name">Tâche</label><input id="f-name" required value="${esc(x.name)}">`}
@@ -3677,7 +3679,7 @@ M.addEventListener('submit',e=>{
   if(g){it=g.items[i];if(g!==ng){g.items.splice(i,1);ng.items.push(it)}}
   else{it={id:uid()};ng.items.push(it)}
   it.name=name;
-  if(k==='since'){it.freq=parseInt(v('#f-freq'))||null;it.cdDays=parseInt(v('#f-cd'))||0;const nl=v('#f-last')||null;if(nl!==it.last){it.last=nl;it.at=null}}
+  if(k==='since'){it.freq=parseInt(v('#f-freq'))||null;it.cdDays=parseInt(v('#f-cd'))||0;it.cdName=v('#f-cdname');const nl=v('#f-last')||null;if(nl!==it.last){it.last=nl;it.at=null}}
   else if(k==='todo'){}
   else if(k==='links'){let u=v('#f-url');if(u&&!/^[a-z]+:\/\//i.test(u))u='https://'+u;it.url=u}
   else{it.ing=$('#f-ing').value;it.steps=$('#f-steps').value;it.link=v('#f-link')}
