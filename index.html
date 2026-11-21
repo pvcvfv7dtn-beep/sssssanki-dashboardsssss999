@@ -2159,7 +2159,8 @@ function taskMoved(ev) {
   if (src && dst && ev.oldIndex != null && ev.newIndex != null && (fk !== tk || ev.oldIndex !== ev.newIndex)) {
     const [t] = src.splice(ev.oldIndex, 1);
     if (t) {
-      const item = fk === tk ? t : tk === "imp" ? { id: t.id, text: t.name, done: !!t.done } : { id: t.id, name: t.text, done: !!t.done };
+      const extra = t.src ? { src: t.src, due: t.due } : {};
+      const item = fk === tk ? t : tk === "imp" ? { id: t.id, text: t.name, done: !!t.done, ...extra } : { id: t.id, name: t.text, done: !!t.done, ...extra };
       dst.splice(Math.min(ev.newIndex, dst.length), 0, item);
       save();
     }
@@ -2221,7 +2222,7 @@ byId("paper").addEventListener("click", e => { if (dragSuppress) { e.stopPropaga
 });
 byId("paper").addEventListener("change", e => {
   const t = e.target;
-  if (t.dataset.ptoggle) { const x = imp.todos.find(x => x.id === t.dataset.ptoggle); if (x) { x.done = t.checked; save(); renderPTodo(); } }
+  if (t.dataset.ptoggle) { const x = imp.todos.find(x => x.id === t.dataset.ptoggle); if (x) { x.done = t.checked; save(); renderPTodo(); if (x.src && window.vieRender) window.vieRender(); } }
   else if (t.dataset.calltime) {
     const c = imp.calls.find(c => c.id === t.dataset.calltime), ts = new Date(t.value).getTime();
     if (c && !isNaN(ts)) { c.ts = ts; save(); }
@@ -2352,6 +2353,7 @@ async function syncNow() {
     }
     localStorage.setItem(SYNC_BASE_KEY, JSON.stringify(M));
     syncStatus = { s: "ok", msg: "", at: Date.now() };
+    if (!window.syncedOnce) { window.syncedOnce = true; if (window.vieRender) window.vieRender(); }
   } catch (e) {
     syncStatus = { s: "err", msg: e.name === "TypeError" ? "réseau indisponible" : e.message };
   } finally {
@@ -3512,7 +3514,7 @@ setInterval(tickPomo, 250);
 setInterval(() => { if (!document.hidden) refresh(); }, 30000);
 initSyncUI(); scheduleSync(300); initPushUI();
 setInterval(() => { if (!document.hidden && syncCfg && !syncBusy) syncNow(); }, 8000);   // le minuteur suit vite sur les autres appareils
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderLists(); renderFam(); renderPeople(); refresh(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderLists(); renderFam(); renderPeople(); refresh(); if (window.vieRender) window.vieRender(); } });
 </script>
 <script>
 (() => {"use strict";
@@ -3579,8 +3581,27 @@ function cdCard(c,t){
  return `<div class="vtile nh${c.arch?'':n<0?' past':n===0?' now':''}" data-tap="none" data-edit="${c.auto?'since:'+c.auto:'cd:'+c.id}" title="${esc(tip)}"><b>${esc(c.name)}</b>${n<0&&!c.arch&&!c.auto?`<button class="mini" data-a="arch" data-v="${c.id}">Archiver</button>`:''}<small class="cj">${big}</small></div>`;
 }
 const addDays=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return iso(d)};
+/* Jour J d'un compte à rebours automatique : une tâche arrive dans la To-do ; cochée (ici ou dans Important), le compte à rebours disparaît.
+   Attend la 1re synchro de l'appareil, pour ne pas recréer une tâche déjà faite ailleurs. */
+function reconcileAuto(){
+ if(typeof syncCfg!=='undefined'&&syncCfg&&!window.syncedOnce)return false;
+ let ch=false;const t=today(),vt=S().todo[0].items,it=(typeof imp!=='undefined'&&imp.todos)||[],all=()=>vt.concat(it);
+ S().since.forEach(g=>g.items.forEach(i=>{
+  if(!(i.cdDays>0&&i.last))return;
+  const due=addDays(i.last,i.cdDays),tid='a-'+i.id+'-'+due,tasks=all().filter(x=>x.src===i.id&&x.due===due);
+  if(tasks.some(x=>x.done)){if(i.cdDone!==due){i.cdDone=due;ch=true}}
+  else if(tasks.length&&i.cdDone===due){delete i.cdDone;ch=true}
+  if(t>=due&&i.cdTodo!==due&&i.cdDone!==due){
+   for(const L of [vt,it])for(let k=L.length-1;k>=0;k--)if(L[k].src===i.id&&L[k].due!==due&&!L[k].done)L.splice(k,1);   // tâche d'un cycle précédent jamais faite
+   if(!all().some(x=>x.id===tid))vt.push({id:tid,name:i.cdName||i.name,done:false,src:i.id,due});
+   i.cdTodo=due;ch=true;
+  }
+ }));
+ if(ch&&typeof renderPTodo==='function')renderPTodo();
+ return ch;
+}
 /* comptes à rebours automatiques : un élément de « Temps depuis » avec un délai (ex. MPH press, 28 j) */
-const autoCd=()=>S().since.flatMap(g=>g.items.filter(i=>i.cdDays>0&&i.last).map(i=>({id:'auto-'+i.id,auto:i.id,name:i.cdName||i.name,src:i.name,days:i.cdDays,from:i.last,date:addDays(i.last,i.cdDays),arch:false})));
+const autoCd=()=>S().since.flatMap(g=>g.items.filter(i=>i.cdDays>0&&i.last&&i.cdDone!==addDays(i.last,i.cdDays)).map(i=>({id:'auto-'+i.id,auto:i.id,name:i.cdName||i.name,src:i.name,days:i.cdDays,from:i.last,date:addDays(i.last,i.cdDays),arch:false})));
 function vCd(){
  const t=today(),srt=a=>a.slice().sort((x,y)=>x.date<y.date?-1:1);
  const act=srt(S().cd.filter(c=>!c.arch).concat(autoCd())),ar=srt(S().cd.filter(c=>c.arch));
@@ -3607,6 +3628,7 @@ function vRec(){
  return `<section class="panel${ui.rec?' open':''}${ui.tab==='rec'?' act':''}" id="p-rec"><div class="ph fold" data-a="recfold"><div class="vseg">${['todo','rec','links'].map(k=>`<button data-a="rmode" data-v="${k}" data-edit="title:${k}" class="${m===k?'on':''}">${TT(k)}${cnt[k]?`<span class="sc">${cnt[k]}</span>`:''}</button>`).join('')}</div><span class="chev">${ui.rec?'▾':'▸'}</span></div><div class="pb"><div data-glist="${m}">${gs}</div>${bar?`<div class="bar2${m==='todo'?' r':''}">${bar}</div>`:''}</div></section>`;
 }
 function render(){
+ if(reconcileAuto()){try{save()}catch(e){}}
  const VS=document.getElementById('vie'),y=VS.scrollTop,ae=document.activeElement,qv=ae&&ae.closest&&ae.closest('#vapp .qadd')?ae.value:null;
  app.innerHTML=`<div class="wrap">${vSince()}${vCd()}${vRec()}</div>`;
  if(qv!==null){const ni=app.querySelector('.qadd input');if(ni){ni.value=qv;ni.focus()}}
