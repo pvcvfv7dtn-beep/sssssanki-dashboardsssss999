@@ -675,6 +675,16 @@
   #vie .ph .pen.nx, #vie .gh .pen.nx { margin-right:0; }
   #vie .ph .pen.padd, #vie .gh .pen.padd { margin-right:auto; margin-left:-4px; }
   #vie .pen:hover { opacity:1; }
+  /* Poignées ⠿, ✎ et + : visibles seulement au survol du bloc (souris) ; au doigt, toucher le fond ou le titre du bloc les affiche */
+  #vie .panel :is(.hd, .ghd, .pen, .tadd, [data-a^="addg-"]) { visibility:hidden; transition:visibility .15s; }
+  #vie .panel .add { display:none; }
+  @media (hover: hover) {
+    #vie .panel:hover :is(.hd, .ghd, .pen, .tadd, [data-a^="addg-"]), #vie .panel:focus-within :is(.hd, .ghd, .pen, .tadd, [data-a^="addg-"]) { visibility:visible; }
+    #vie .panel:hover .add, #vie .panel:focus-within .add { display:block; }
+  }
+  #vie .panel.reveal :is(.hd, .ghd, .pen, .tadd, [data-a^="addg-"]) { visibility:visible; }
+  #vie .panel.reveal .add { display:block; }
+  #vie .panel.reveal { box-shadow:0 0 0 1.5px color-mix(in srgb, var(--acc) 45%, transparent), 0 1px 3px rgba(0,0,0,.05); }
   #vie .list[data-list="since"]:empty { display:none; }   /* groupe vide : pas de « Aucun élément » ni d'espace */
   #vie .vghost { font-size:12px; min-height:28px; padding:4px 9px; border-radius:8px; }
   #vie .late { font-size:11px; padding:1px 8px; }
@@ -3567,9 +3577,11 @@ function render(){
  const VS=document.getElementById('vie'),y=VS.scrollTop,ae=document.activeElement,qv=ae&&ae.closest&&ae.closest('#vapp .qadd')?ae.value:null;
  app.innerHTML=`<div class="wrap">${vSince()}${vCd()}${vRec()}</div>`;
  if(qv!==null){const ni=app.querySelector('.qadd input');if(ni){ni.value=qv;ni.focus()}}
- VS.scrollTop=y;sortables();
+ VS.scrollTop=y;applyReveal();sortables();
 }
-let dragging=false;
+let dragging=false,revealed=null;
+const touchUI=matchMedia('(hover: none)');
+function applyReveal(){app.querySelectorAll('.panel').forEach(p=>p.classList.toggle('reveal',p.id===revealed))}
 function sortables(){
  if(!window.Sortable)return;
  const o=k=>({animation:150,fallbackTolerance:4,onStart:()=>{dragging=true},onEnd:()=>{dragging=false;rebuild(k)}});
@@ -3692,6 +3704,9 @@ app.addEventListener('pointermove',e=>{if(lp&&Math.hypot(e.clientX-lp.x,e.client
 app.addEventListener('contextmenu',e=>{const el=e.target.closest('[data-edit]');if(!el)return;e.preventDefault();if(el.matches('.lnk,.vseg button')&&e.pointerType!=='touch'&&!lpFired&&!lp)edit(el.dataset.edit)});
 app.addEventListener('click',e=>{
  if(lpFired){lpFired=false;e.preventDefault();return}
+ /* au doigt : toucher le fond ou le titre d'un bloc affiche / masque ses poignées, ✎ et + */
+ if(touchUI.matches){const pn=e.target.closest('.panel');
+  if(pn&&!e.target.closest('button,a,input,textarea,select,form,[data-tap],.vtile,.td,.rc,.chev,details')){revealed=revealed===pn.id?null:pn.id;applyReveal();return}}
  const b=e.target.closest('[data-a]');if(b){act(b.dataset.a,b.dataset.v);return}
  if(e.target.closest('.hd,.ghd,a,.rb'))return;
  const el=e.target.closest('[data-tap]');if(!el)return;
@@ -3705,6 +3720,7 @@ function changed(){
  try{save()}catch(e){}
  render();
 }
+document.addEventListener('pointerdown',e=>{if(revealed&&!e.target.closest('#vapp .panel,#vmodal')){revealed=null;applyReveal()}});
 window.vieRender=()=>{if(!modalOpen&&!dragging)render()};
 render();
 setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
