@@ -737,7 +737,7 @@
   html, body { height:100%; overflow:hidden; overscroll-behavior:none; }
   body { display:block; padding:0; }
   .screen { position:fixed; inset:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; background:var(--bg);
-    transition:transform .85s cubic-bezier(.7,0,.2,1); }
+    transition:transform .5s cubic-bezier(.6,0,.2,1); }
   #ankiScreen { display:flex; align-items:center; justify-content:center; padding:16px clamp(16px,2.5vw,32px) 58px; }
   #vie { transform:translateY(100%); }
   body.onVie #ankiScreen { transform:translateY(-38%); }
@@ -3864,7 +3864,7 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
   const P = document.getElementById("paper"), slot = document.getElementById("vimpSlot"), thread = document.getElementById("thread");
   const app = document.querySelector(".app"), sw = document.getElementById("screenSwitch");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
-  let onVie = false, busy = false, needQuiet = false, lastWheel = 0, gesture = null, seq = 0, safety = 0;
+  let onVie = false, busy = false, needQuiet = false, lastWheel = 0, lastDir = 0, gesture = null, seq = 0, safety = 0;
 
   const placeInVie = () => { P.classList.add("inVie"); slot.appendChild(P); };
   const placeInAnki = () => { P.classList.remove("inVie"); app.insertBefore(P, app.querySelector(".bottom-right")); try { applyCollapsed(); } catch {} };
@@ -3883,8 +3883,10 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
   }
   const setSwitch = () => sw.querySelectorAll("button").forEach(b => b.classList.toggle("on", (b.dataset.go === "vie") === onVie));
 
+  let pending = null;
   function go(toVie) {
-    if (busy || toVie === onVie) return;
+    if (busy) { pending = toVie !== onVie ? toVie : null; return; }   // retenu, joué dès l'arrivée
+    if (toVie === onVie) return;
     busy = true; needQuiet = true;
     const my = ++seq; clearTimeout(safety);
     try { P.getAnimations().forEach(a => a.cancel()); } catch {}   // aucune animation d'un passage précédent ne doit rester accrochée
@@ -3907,15 +3909,16 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
       P.removeAttribute("style"); P.classList.remove("flying");
       if (toVie) placeInVie(); else placeInAnki();
       busy = false;
+      if (pending !== null) { const pv = pending; pending = null; if (pv !== onVie) setTimeout(() => go(pv), 0); }
     };
     if (reduce.matches || !P.animate) { land(); return; }
     const box = (r, k, sh) => ({ left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", transform: `scale(${k})`, boxShadow: sh });
     const flat = "0 1px 3px rgba(0,0,0,.08)";
     const midR = { left: (from.left + to.left) / 2, top: (from.top + to.top) / 2, width: (from.width + to.width) / 2, height: (from.height + to.height) / 2 };
     const anim = P.animate([box(from, 1, flat), Object.assign(box(midR, 1.04, "0 24px 50px rgba(40,30,0,.30)"), { offset: .5 }), box(to, 1, flat)],
-      { duration: 900, easing: "cubic-bezier(.45,0,.2,1)", fill: "forwards" });
+      { duration: 520, easing: "cubic-bezier(.45,0,.2,1)", fill: "forwards" });
     anim.onfinish = () => { land(); anim.cancel(); };
-    safety = setTimeout(() => { if (my !== seq) return; try { anim.cancel(); } catch {} land(); }, 1600);
+    safety = setTimeout(() => { if (my !== seq) return; try { anim.cancel(); } catch {} land(); }, 1000);
   }
   window.screenGo = go;
   setInterval(() => {
@@ -3947,8 +3950,12 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
   /* molette / pavé tactile : un geste = un passage, s'il a commencé au bord de l'écran */
   addEventListener("wheel", e => {
     if (modalOpen() || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
-    const now = Date.now(), fresh = now - lastWheel > 280; lastWheel = now;
-    if (busy) { e.preventDefault(); return; }
+    const now = Date.now(), d0 = Math.sign(e.deltaY), fresh = now - lastWheel > 200 || (d0 && d0 !== lastDir); lastWheel = now; if (d0) lastDir = d0;
+    if (busy) {
+      e.preventDefault();
+      if (fresh) { needQuiet = true; armed = null; if ((d0 > 0 && !onVie) || (d0 < 0 && onVie)) go(d0 > 0); }   // geste en sens inverse pendant le passage
+      return;
+    }
     if (fresh) { needQuiet = false; gesture = { down: !onVie && atEdge(1), up: onVie && atEdge(-1), inner: innerScroll(e.target, Math.sign(e.deltaY)) }; }
     if (needQuiet || !gesture) return;
     const dir = Math.sign(e.deltaY); if (!dir) return;
@@ -3961,7 +3968,7 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
   let t0 = null;
   addEventListener("touchstart", e => {
     t0 = null;
-    if (busy || modalOpen() || e.touches.length > 1) return;
+    if (modalOpen() || e.touches.length > 1) return;
     const t = e.target;
     if (t.closest && t.closest(".hd,.ghd,.grip,.vtrack,input,textarea,select,.person")) return;
     t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY, t,
