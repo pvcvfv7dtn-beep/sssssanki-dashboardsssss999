@@ -288,6 +288,16 @@
   /* ---------- Pomodoro ---------- */
   .pomo { align-items: center; position: relative; padding: 10px 12px; }
   .pomo h2 { position: absolute; top: 12px; left: 14px; font-size: 10px; margin: 0; z-index: 1; }
+  /* fantôme : assombrit « Items » et « À ajouter / À creuser / Liens de cours » ; rester 1 s dessus les rallume */
+  .ghostbtn { position: absolute; top: 30px; left: 10px; z-index: 1; border: 0; background: none; cursor: pointer; font-size: 15px; line-height: 1;
+    padding: 3px 4px; border-radius: 8px; opacity: .35; filter: grayscale(1); transition: opacity .15s, filter .15s, transform .12s; }
+  .ghostbtn:hover { opacity: .8; }
+  .ghostbtn:active { transform: scale(.9); }
+  body.ghost .ghostbtn { opacity: 1; filter: none; }
+  .a-items, .a-lists { transition: background-color .5s ease; }
+  .a-items > *, .a-lists > * { transition: opacity .5s ease; }
+  body.ghost .a-items:not(.peek), body.ghost .a-lists:not(.peek) { background: color-mix(in srgb, var(--card) 72%, #000); }
+  body.ghost .a-items:not(.peek) > *, body.ghost .a-lists:not(.peek) > * { opacity: .1; }
   .worktot { position: absolute; top: 11px; right: 14px; z-index: 1; font: 200 13px/1 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; letter-spacing: .01em; color: var(--text); opacity: .75; font-variant-numeric: tabular-nums; }
   .ring .clock.over { color: #d9822b; }
   .tomato {
@@ -800,6 +810,7 @@
     <!-- POMODORO -->
   <section class="card pomo a-pomo">
     <h2>Pomodoro</h2>
+    <button class="ghostbtn" id="ghostBtn" type="button" title="Mode concentration : assombrir Items et À ajouter (rester 1 s dessus pour les revoir)" aria-pressed="false">👻</button>
     <span class="worktot" id="workTot" title="Temps de travail aujourd'hui (dépassements inclus)"></span>
     <button class="tomato" data-open="settings" title="Réglages"><b id="pomoCount">0</b> 🍅</button>
     <div class="pomo-body">
@@ -2150,6 +2161,32 @@ function setVolume(v) {
   });
 }
 document.addEventListener("pointerdown", e => { if (!byId("snd").contains(e.target)) byId("snd").classList.remove("vol-open"); });
+/* ---- Fantôme (mode concentration), propre à cet appareil ---- */
+const GHOST_KEY = "ankiTrackerEDN.ghost";
+function applyGhost(on) {
+  document.body.classList.toggle("ghost", on);
+  byId("ghostBtn").setAttribute("aria-pressed", String(on));
+  document.querySelectorAll(".a-items, .a-lists").forEach(c => c.classList.remove("peek"));
+}
+byId("ghostBtn").addEventListener("click", () => {
+  const on = !document.body.classList.contains("ghost");
+  try { localStorage.setItem(GHOST_KEY, on ? "1" : ""); } catch {}
+  applyGhost(on);
+});
+applyGhost((() => { try { return localStorage.getItem(GHOST_KEY) === "1"; } catch { return false; } })());
+document.querySelectorAll(".a-items, .a-lists").forEach(card => {
+  let t = 0;
+  const later = () => { clearTimeout(t); t = setTimeout(() => card.classList.add("peek"), 1000); };
+  card.addEventListener("pointerenter", e => { if (e.pointerType === "mouse" && document.body.classList.contains("ghost")) later(); });
+  card.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") { clearTimeout(t); card.classList.remove("peek"); } });
+  /* au doigt : appuyer 1 s dessus le rallume, jusqu'au prochain toucher ailleurs */
+  card.addEventListener("pointerdown", e => { if (e.pointerType !== "mouse" && document.body.classList.contains("ghost") && !card.classList.contains("peek")) later(); });
+  for (const ev of ["pointerup", "pointercancel"]) card.addEventListener(ev, e => { if (e.pointerType !== "mouse" && !card.classList.contains("peek")) clearTimeout(t); });
+});
+document.addEventListener("pointerdown", e => {
+  if (e.pointerType === "mouse") return;
+  document.querySelectorAll(".a-items.peek, .a-lists.peek").forEach(c => { if (!c.contains(e.target)) c.classList.remove("peek"); });
+});
 function applyCollapsed() {
   const c = !!imp.collapsed;
   byId("paper").classList.toggle("collapsed", c);
