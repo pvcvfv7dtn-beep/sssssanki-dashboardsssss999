@@ -672,6 +672,9 @@
   #vie .ph { min-height:26px; margin-bottom:12px; }
   #vie .ph h2 { font-size:12px; font-weight:650; text-transform:uppercase; letter-spacing:.06em; color:var(--mute); }
   #vie .pen { font-size:11px; opacity:.5; padding:2px 4px; }
+  #vie .ph .pen.nx, #vie .gh .pen.nx { margin-right:0; }
+  #vie .ph .pen.padd, #vie .gh .pen.padd { margin-right:auto; margin-left:-4px; }
+  #vie .pen:hover { opacity:1; }
   #vie .vghost { font-size:12px; min-height:28px; padding:4px 9px; border-radius:8px; }
   #vie .late { font-size:11px; padding:1px 8px; }
   #vie .cnt { font-size:11px; }
@@ -3462,6 +3465,7 @@ function normVie(v){
 const TT=k=>esc(S().titles[k]);
 const hm=t=>{const d=new Date(t);return d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
 const pen=v=>`<button class="pen" data-a="edit" data-v="${v}" aria-label="Modifier">✎</button>`;
+const penAdd=(v,a,g)=>`<button class="pen nx" data-a="edit" data-v="${v}" aria-label="Modifier">✎</button><button class="pen padd" data-a="${a}"${g?` data-v="${g}"`:''} aria-label="Ajouter">+</button>`;
 let ui={tab:'since',rec:false,shut:{},open:{},rmode:'todo',ledit:false};
 try{const u=JSON.parse(localStorage.getItem(LK+'-ui')||'null');if(u)ui=Object.assign(ui,u)}catch(e){}
 const saveUi=()=>{try{localStorage.setItem(LK+'-ui',JSON.stringify(ui))}catch(e){}};
@@ -3469,7 +3473,7 @@ function findIt(gs,id){for(const g of gs){const i=g.items.findIndex(x=>x.id===id
 
 function grp(kind,g,inner,after){
  const sh=!!ui.shut[g.id],tl=kind==='since'||kind==='links';
- return `<div class="grp" data-g="${g.id}"><div class="gh${g.name?'':' nog'}" data-tap="gtog" data-edit="g-${kind}:${g.id}"><span class="ghd" aria-label="Déplacer le groupe">⠿</span><b>${esc(g.name)}</b>${pen('g-'+kind+':'+g.id)}<span class="cnt">${g.items.length}</span><span class="chev">${sh?'▸':'▾'}</span></div><div class="list${tl?' tiles':''}${kind==='todo'?' tdl':''}${sh?' shut':''}" data-list="${kind}">${inner}${tl?`<button class="tadd" data-a="add-${kind}" data-v="${g.id}" aria-label="Ajouter">+</button>`:''}</div>${sh?'':(after!=null?after:(tl?'':`<button class="add" data-a="add-${kind}" data-v="${g.id}">+ Ajouter</button>`))}</div>`;
+ return `<div class="grp" data-g="${g.id}"><div class="gh${g.name?'':' nog'}" data-tap="gtog" data-edit="g-${kind}:${g.id}"><span class="ghd" aria-label="Déplacer le groupe">⠿</span><b>${esc(g.name)}</b>${kind==='since'?penAdd('g-since:'+g.id,'add-since',g.id):pen('g-'+kind+':'+g.id)}<span class="cnt">${g.items.length}</span><span class="chev">${sh?'▸':'▾'}</span></div><div class="list${tl?' tiles':''}${kind==='todo'?' tdl':''}${sh?' shut':''}" data-list="${kind}">${inner}${kind==='links'?`<button class="tadd" data-a="add-${kind}" data-v="${g.id}" aria-label="Ajouter">+</button>`:''}</div>${sh?'':(after!=null?after:(tl?'':`<button class="add" data-a="add-${kind}" data-v="${g.id}">+ Ajouter</button>`))}</div>`;
 }
 function vSince(){
  const t=today();let late=0;
@@ -3481,7 +3485,7 @@ function vSince(){
   const lg=g.items.filter(i=>i.last).sort((x,y)=>(y.at||+pd(y.last))-(x.at||+pd(x.last))).slice(0,3);
   return grp('since',g,tiles,lg.length?'<div class="log">'+lg.map(i=>`<div><span>${esc(i.name)}</span><span>${i.at&&iso(new Date(i.at))===i.last?hm(i.at):fdate(i.last)}</span></div>`).join('')+'</div>':'');
  }).join('');
- return `<section class="panel${ui.tab==='since'?' act':''}" id="p-since"><div class="ph"><h2>${TT('since')}</h2>${pen('title:since')}${late?`<span class="late">${late} en retard</span>`:''}<button class="vghost" data-a="addg-since">+ Groupe</button></div><div data-glist="since">${gs}</div></section>`;
+ return `<section class="panel${ui.tab==='since'?' act':''}" id="p-since"><div class="ph"><h2>${TT('since')}</h2>${penAdd('title:since','add-since')}${late?`<span class="late">${late} en retard</span>`:''}<button class="vghost" data-a="addg-since">+ Groupe</button></div><div data-glist="since">${gs}</div></section>`;
 }
 function human(n){if(n>=60)return'≈ '+Math.round(n/30.44)+' mois';if(n>=14)return Math.floor(n/7)+' sem.'+(n%7?' et '+n%7+' j':'');return''}
 function cdCard(c,t){
@@ -3491,7 +3495,7 @@ function cdCard(c,t){
 function vCd(){
  const t=today(),srt=a=>a.slice().sort((x,y)=>x.date<y.date?-1:1);
  const act=srt(S().cd.filter(c=>!c.arch)),ar=srt(S().cd.filter(c=>c.arch));
- return `<section class="panel${ui.tab==='cd'?' act':''}" id="p-cd"><div class="ph"><h2>${TT('cd')}</h2>${pen('title:cd')}</div><div class="tiles">${act.map(c=>cdCard(c,t)).join('')}<button class="tadd" data-a="add-cd" aria-label="Ajouter une date">+</button></div>${ar.length?`<details><summary>Archivées (${ar.length})</summary><div class="tiles">${ar.map(c=>cdCard(c,t)).join('')}</div></details>`:''}</section>`;
+ return `<section class="panel${ui.tab==='cd'?' act':''}" id="p-cd"><div class="ph"><h2>${TT('cd')}</h2>${penAdd('title:cd','add-cd')}</div><div class="tiles">${act.map(c=>cdCard(c,t)).join('')}</div>${ar.length?`<details><summary>Archivées (${ar.length})</summary><div class="tiles">${ar.map(c=>cdCard(c,t)).join('')}</div></details>`:''}</section>`;
 }
 function vLinks(){
  return S().links.map(g=>grp('links',g,g.items.map(l=>ui.ledit
