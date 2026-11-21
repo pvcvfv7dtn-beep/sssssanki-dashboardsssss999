@@ -404,6 +404,9 @@
   button.ghost { background: transparent; color: var(--muted); border: 0; font: inherit; font-size: 12px; cursor: pointer; padding: 2px 4px; }
   button.ghost:hover { color: var(--text); }
   .scroll { flex: 0 1 auto; overflow-y: auto; min-height: 0; margin-right: -8px; padding-right: 8px; }
+  /* écran Anki : listes qui défilent sans barre de défilement visible (le défilement reste possible) */
+  #ankiScreen .scroll, #ankiScreen .links, #ankiScreen .editlog { scrollbar-width: none; -ms-overflow-style: none; }
+  #ankiScreen .scroll::-webkit-scrollbar, #ankiScreen .links::-webkit-scrollbar, #ankiScreen .editlog::-webkit-scrollbar { display: none; }
   ul.list { list-style: none; }
   ul.list li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
   ul.list li:last-child { border-bottom: 0; }
