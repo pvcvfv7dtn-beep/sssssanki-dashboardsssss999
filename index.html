@@ -294,8 +294,8 @@
   .ghostbtn:hover { opacity: .8; }
   .ghostbtn:active { transform: scale(.9); }
   body.ghost .ghostbtn { opacity: 1; filter: none; }
-  .ghostveil { position: fixed; inset: -12%; z-index: 60; pointer-events: none; filter: url(#gwarp); }
-  .ghostveil .ghostink { position: absolute; inset: 0; }   /* plus grande que l'écran : pas de trou sur les bords une fois déformée */
+  .ghostveil { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+  .ghostveil .ghostink { position: absolute; inset: 0; }
   .ghostfly { position: fixed; z-index: 61; pointer-events: none; font-size: 18px; line-height: 1; filter: drop-shadow(0 0 10px rgba(190,200,255,.7)); }
   /* Mode focus (fantôme) : Pomodoro, Anki et Journée un peu agrandis ; le reste estompé, flouté et assombri ;
      tout l'écran légèrement assombri pour reposer les yeux. Survol ~0,45 s : la carte redevient nette (délai d'intention habituel),
@@ -2195,36 +2195,31 @@ function applyGhost(on) {
   byId("ghostBtn").setAttribute("aria-pressed", String(on));
   document.querySelectorAll(".a-items, .a-lists, #paper").forEach(c => c.classList.remove("peek"));
 }
-/* Passage en mode fantôme : une ombre se répand depuis le fantôme comme de la fumée (bord flou et irrégulier,
-   qui ondule puis s'apaise en s'étendant), pendant que le fantôme s'envole en flottant. En sortie, l'ombre se retire vers lui.
-   Le thème bascule sous l'ombre, sans à-coup. */
-function ghostWarp() {
-  if (document.getElementById("gwarp")) return;
-  document.body.insertAdjacentHTML("beforeend", `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="gwarp" x="-25%" y="-25%" width="150%" height="150%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.009 0.013" numOctaves="3" seed="4" result="n"/>
-    <feDisplacementMap id="gwarpMap" in="SourceGraphic" in2="n" scale="160" xChannelSelector="R" yChannelSelector="G"/></filter></svg>`);
-}
+/* Passage en mode fantôme : un cercle d'ombre s'étend depuis le fantôme, comme une goutte d'encre dans l'eau :
+   bord doux et estompé, forme qui respire légèrement (jamais un cercle parfait), et une onde claire qui le précède.
+   Il part vite et ralentit en arrivant aux bords. En sortie, il se resserre vers le fantôme. Le thème bascule sous l'ombre. */
 function ghostFx(on) {
-  ghostWarp();
   const b = byId("ghostBtn").getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height / 2;
-  const R = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) + 260, FEATHER = 240;
+  const R = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) * 1.25;
   const veil = document.createElement("div"); veil.className = "ghostveil";
   const ink = document.createElement("div"); ink.className = "ghostink"; veil.appendChild(ink); document.body.appendChild(veil);
-  const map = document.getElementById("gwarpMap"), seedEl = map.previousElementSibling;
-  seedEl.setAttribute("seed", String(1 + Math.floor(Math.random() * 90)));   // une forme différente à chaque fois
   const fly = document.createElement("div"); fly.className = "ghostfly"; fly.textContent = "👻";
   Object.assign(fly.style, { left: x + "px", top: y + "px" }); document.body.appendChild(fly);
-  const dur = on ? 1500 : 1050, t0 = performance.now();
+  const dur = on ? 1400 : 1000, t0 = performance.now(), ph = Math.random() * 6;
   const easeOut = t => 1 - Math.pow(1 - t, 3), easeInOut = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   let switched = false;
   const frame = now => {
-    const k = Math.min(1, (now - t0) / dur);
-    const g = on ? easeOut(Math.min(1, k / .8)) : 1 - easeInOut(k);           // étendue de l'ombre
-    const r = g * R, breathe = Math.sin(now / 140) * 10;                         // léger souffle du bord
-    ink.style.background = `radial-gradient(circle at ${x + innerWidth * .12}px ${y + innerHeight * .12}px, rgba(14,12,26,.96) 0, rgba(22,18,40,.9) ${Math.max(0, r - FEATHER * .6 + breathe)}px, rgba(30,26,52,.45) ${r + breathe}px, rgba(30,26,52,0) ${r + FEATHER}px)`;
-    map.setAttribute("scale", String(40 + 190 * (1 - g)));                       // bord très tourmenté au début, qui s'apaise
-    veil.style.opacity = on ? (k < .78 ? 1 : 1 - (k - .78) / .22) : (k < .15 ? k / .15 : 1);
-    if (!switched && (on ? k > .3 : k > .55)) { switched = true; applyGhost(on); }
+    const k = Math.min(1, (now - t0) / dur), ms = now - t0;
+    const g = on ? easeOut(Math.min(1, k / .78)) : 1 - easeInOut(k);
+    const r = Math.max(1, g * R);
+    const rx = r * (1 + .045 * Math.sin(ms / 160 + ph)), ry = r * (1 + .045 * Math.cos(ms / 205 + ph));   // respiration de la forme
+    const feather = 34 - 20 * g;                                                                           // bord très doux au départ, plus net ensuite
+    const at = `at ${x}px ${y}px`;
+    ink.style.background =
+      `radial-gradient(ellipse ${rx * 1.14}px ${ry * 1.14}px ${at}, transparent 84%, rgba(150,140,230,${(.22 * (1 - g * .7)).toFixed(3)}) 92%, transparent 100%),` +   // onde qui précède
+      `radial-gradient(ellipse ${rx}px ${ry}px ${at}, rgba(12,11,22,.95) 0%, rgba(20,17,36,.9) ${100 - feather}%, rgba(26,22,46,.5) ${100 - feather / 2.5}%, transparent 100%)`;
+    veil.style.opacity = on ? (k < .8 ? 1 : 1 - (k - .8) / .2) : (k < .12 ? k / .12 : 1);
+    if (!switched && (on ? k > .32 : k > .55)) { switched = true; applyGhost(on); }
     if (k < 1) requestAnimationFrame(frame); else { veil.remove(); fly.remove(); }
   };
   requestAnimationFrame(frame);
@@ -2233,7 +2228,7 @@ function ghostFx(on) {
   const path = [{ transform: T(0, 0, 0, 1), opacity: 1 }, { transform: T(16, -26, -12, 1.7), opacity: 1, offset: .2 }, { transform: T(-8, -58, 9, 2.3), opacity: .95, offset: .42 },
                 { transform: T(20, -92, -7, 2.7), opacity: .7, offset: .66 }, { transform: T(2, -128, 5, 3.1), opacity: .3, offset: .85 }, { transform: T(10, -150, 0, 3.3), opacity: 0 }];
   fly.animate(on ? path : path.slice().reverse().map((f, i, a) => Object.assign({}, f, { offset: i / (a.length - 1) })),
-    { duration: on ? 1500 : 1000, easing: "ease-in-out", fill: "forwards" });
+    { duration: on ? 1400 : 1000, easing: "ease-in-out", fill: "forwards" });
   if (on) byId("ghostBtn").animate([{ transform: "scale(1)" }, { transform: "scale(.6)", offset: .15 }, { transform: "scale(1.25) rotate(-8deg)", offset: .7 }, { transform: "scale(1)" }],
     { duration: 1500, easing: "ease-out" });
 }
