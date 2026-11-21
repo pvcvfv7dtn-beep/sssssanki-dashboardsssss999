@@ -765,6 +765,9 @@
     #vie .vlayout { display:block; }
     #vimpSlot { position:static; margin-bottom:14px; }
   }
+  #undoToast { position:fixed; left:50%; bottom:58px; transform:translate(-50%, 8px); z-index:40; padding:7px 14px; border-radius:12px;
+    background:var(--text); color:var(--bg); font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .15s, transform .2s; }
+  #undoToast.on { opacity:.94; transform:translate(-50%, 0); }
   #screenSwitch { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); z-index:25; display:flex; gap:3px; padding:3px;
     border-radius:12px; background:var(--card); box-shadow:0 2px 14px rgba(0,0,0,.16); }
   #screenSwitch button { border:0; background:none; font:inherit; font-size:13px; font-weight:650; color:var(--muted); padding:7px 18px; border-radius:9px; cursor:pointer; }
@@ -1056,7 +1059,7 @@ normalize();
 const SYNC_CFG_KEY = KEY + ".sync", SYNC_BASE_KEY = KEY + ".syncBase";
 let syncCfg = (() => { try { return JSON.parse(localStorage.getItem(SYNC_CFG_KEY) || "null"); } catch { return null; } })();
 let syncBusy = false, syncAgain = false, syncTimer = 0, syncStatus = { s: "off", msg: "" }, cloudAnki = null, localAnkiAt = 0;
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} scheduleSync(); };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} trackUndo(); scheduleSync(); };
 
 /* ================= Jour Anki ================= */
 function dayStart(d = new Date()) {
@@ -2353,7 +2356,62 @@ function applyState(obj) {
   normalize();
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
   renderAll();
+  undoBase = undoFlat();   // ce qui arrive des autres appareils n'est pas une modification à annuler ici
 }
+
+/* ================= Annuler / rétablir (⌘Z / Ctrl+Z, ⌘⇧Z / Ctrl+Y) =================
+   Chaque enregistrement fait sur cet appareil devient une étape, annulable pendant 2 minutes.
+   On ne garde que les clés modifiées : annuler ne touche pas à ce qui vient des autres appareils.
+   Le minuteur, le temps de travail et la position ne sont jamais annulés. */
+const UNDO_MS = 120000, NOUNDO = new Set(["pomoLive", "workMs", "pomoDone", "loc"]);
+var undoBase = null, undoStack = [], redoStack = [], undoAuto = false;
+function undoFlat() {
+  const f = flat(state), o = {};
+  for (const p in f) if (!NOUNDO.has(p.split(SEP)[0])) o[p] = f[p];
+  return o;
+}
+function trackUndo() {
+  let cur; try { cur = undoFlat(); } catch { return; }
+  if (!undoBase) { undoBase = cur; return; }
+  const before = {}, after = {};
+  for (const p of new Set([...Object.keys(cur), ...Object.keys(undoBase)])) if (cur[p] !== undoBase[p]) { before[p] = undoBase[p]; after[p] = cur[p]; }
+  undoBase = cur;
+  if (!Object.keys(before).length || undoAuto) return;   // rien de changé, ou changement automatique (comptes à rebours…)
+  undoStack.push({ t: Date.now(), before, after }); if (undoStack.length > 80) undoStack.shift();
+  redoStack = [];
+}
+function applyUndoValues(vals) {
+  const f = flat(state);
+  for (const p in vals) { if (vals[p] === undefined) delete f[p]; else f[p] = vals[p]; }
+  applyState(unflat(f)); save();
+}
+function undoStep(redo) {
+  const now = Date.now(), from = redo ? redoStack : undoStack, to = redo ? undoStack : redoStack;
+  while (from.length && now - from[from.length - 1].t > UNDO_MS) from.pop();   // plus de 2 minutes : n'est plus annulable
+  for (let i = from.length - 1; i >= 0; i--) if (now - from[i].t > UNDO_MS) { from.splice(0, i + 1); break; }
+  const e = from.pop();
+  if (!e) { undoToast(redo ? "Rien à rétablir" : "Rien à annuler (2 min maximum)"); return; }
+  applyUndoValues(redo ? e.after : e.before);
+  to.push({ t: redo ? e.t : now, before: e.before, after: e.after });
+  const n = undoStack.filter(x => now - x.t <= UNDO_MS).length;
+  undoToast((redo ? "Rétabli" : "Annulé") + (n && !redo ? ` · encore ${n} étape${n > 1 ? "s" : ""}` : ""));
+}
+let undoToastTimer = 0;
+function undoToast(msg) {
+  let el = document.getElementById("undoToast");
+  if (!el) { el = document.createElement("div"); el.id = "undoToast"; document.body.appendChild(el); }
+  el.textContent = msg; el.classList.add("on"); clearTimeout(undoToastTimer);
+  undoToastTimer = setTimeout(() => el.classList.remove("on"), 1800);
+}
+document.addEventListener("keydown", e => {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+  const k = e.key.toLowerCase(); if (k !== "z" && k !== "y") return;
+  const a = document.activeElement;
+  if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return;   // dans un champ : annulation normale du texte
+  if (document.querySelector("#vmodal.on, .modal.open")) return;
+  e.preventDefault();
+  undoStep(k === "y" || e.shiftKey);
+});
 function renderAll() {
   renderLinks(); renderDayLabels(); renderFam(); renderCalls(); renderPTodo(); applyCollapsed(); applyTheme(); applyToggles();
   renderLists(); tickClock(); fillSettings();
@@ -3565,6 +3623,7 @@ setInterval(tickClock, 1000);
 setInterval(tickPomo, 250);
 setInterval(() => { if (!document.hidden) refresh(); }, 30000);
 initSyncUI(); scheduleSync(300); initPushUI();
+addEventListener("load", () => { undoBase = undoFlat(); });
 setInterval(() => { if (!document.hidden && syncCfg && !syncBusy) syncNow(); }, 8000);   // le minuteur suit vite sur les autres appareils
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderLists(); renderFam(); renderPeople(); refresh(); if (window.vieRender) window.vieRender(); } });
 </script>
@@ -3695,7 +3754,7 @@ function vRec(){
  return `<section class="panel${ui.rec?' open':''}${ui.tab==='rec'?' act':''}" id="p-rec"><div class="ph fold" data-a="recfold"><div class="vseg">${['todo','rec','links'].map(k=>`<button data-a="rmode" data-v="${k}" data-edit="title:${k}" class="${m===k?'on':''}">${TT(k)}${cnt[k]?`<span class="sc">${cnt[k]}</span>`:''}</button>`).join('')}</div><span class="chev">${ui.rec?'▾':'▸'}</span></div><div class="pb"><div data-glist="${m}">${gs}</div>${bar?`<div class="bar2${m==='todo'?' r':''}">${bar}</div>`:''}</div></section>`;
 }
 function render(){
- if(reconcileAuto()){try{save()}catch(e){}}
+ if(reconcileAuto()){try{undoAuto=true;save()}catch(e){}finally{undoAuto=false}}
  const VS=document.getElementById('vie'),y=VS.scrollTop,ae=document.activeElement,qv=ae&&ae.closest&&ae.closest('#vapp .qadd')?ae.value:null;
  app.innerHTML=`<div class="wrap">${vSince()}${vCd()}${vRec()}</div>`;
  if(qv!==null){const ni=app.querySelector('.qadd input');if(ni){ni.value=qv;ni.focus()}}
