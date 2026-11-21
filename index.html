@@ -3706,7 +3706,7 @@ function vSince(){
   const tiles=g.items.map(it=>{
    const d=it.last?diff(t,it.last):null;let c='';
    if(d!==null&&it.freq){const r=d/it.freq;c=r>=1?'bad':r>=.75?'mid':'good';if(r>=1)late++}
-   return `<div class="vtile ${c}" data-id="${it.id}" data-tap="reset" data-edit="since:${it.id}" title="${it.freq?'Tous les '+it.freq+' j':''}"><span class="hd" aria-label="Déplacer">⠿</span><b>${esc(it.name)}</b><small>${d===null?'–':'J'+d}${it.freq?'<span class="fq"> / '+it.freq+'</span>':''}</small></div>`}).join('');
+   return `<div class="vtile nh ${c}" data-id="${it.id}" data-tap="reset" data-edit="since:${it.id}" title="${it.freq?'Tous les '+it.freq+' j':''}"><b>${esc(it.name)}</b><small>${d===null?'–':'J'+d}${it.freq?'<span class="fq"> / '+it.freq+'</span>':''}</small></div>`}).join('');
   const lg=g.items.filter(i=>i.last).sort((x,y)=>(y.at||+pd(y.last))-(x.at||+pd(x.last))).slice(0,3);
   const isLast=vis.length&&vis[vis.length-1]===g,grip=vis.includes(g)&&!isLast?`<div class="colgrip" data-g="${g.id}" title="Glisser pour élargir / amincir · double-clic pour égaliser"></div>`:'';
   return grp('since',g,tiles,(lg.length?'<div class="log">'+lg.map(i=>`<div><span>${esc(i.name)}</span><span>${i.at&&iso(new Date(i.at))===i.last?hm(i.at):fdate(i.last)}</span></div>`).join('')+'</div>':'')+grip);
@@ -3797,6 +3797,7 @@ function sortables(){
  const o=k=>({animation:150,fallbackTolerance:4,onStart:()=>{dragging=true},onEnd:()=>{dragging=false;rebuild(k)}});
  app.querySelectorAll('[data-list]').forEach(l=>{
   const k=l.dataset.list,opt=Object.assign(o(k),{group:k,handle:'.hd',draggable:{rec:'.rc',todo:'.td'}[k]||'.vtile'});
+  if(k==='since')Object.assign(opt,{handle:null,delay:220,delayOnTouchOnly:true});
   if(k==='todo')Object.assign(opt,{group:'tasks',onStart:()=>{dragging=true;taskDragStart()},
    onEnd:ev=>{dragging=false;if(ev.from!==ev.to)taskMoved(ev);else{taskDrag=false;document.body.classList.remove('taskdrag');rebuild('todo')}}});
   Sortable.create(l,opt)});
