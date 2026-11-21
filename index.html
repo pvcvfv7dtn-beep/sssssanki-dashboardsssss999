@@ -1507,7 +1507,7 @@ function renderLists() {
   const isC = todoTab === "courses";
   for (const [id, show] of [["todoForm", !isC], ["list-todo", !isC], ["clearDone", !isC], ["courseForm", isC], ["list-courses", isC], ["addGroup", isC]])
     document.getElementById(id).hidden = !show;
-  document.getElementById("list-todo").innerHTML = isC ? "" : listHTML(state[todoTab], todoTab, "");
+  if (!todoDrag) document.getElementById("list-todo").innerHTML = isC ? "" : listHTML(state[todoTab], todoTab, "");
   for (const name of ["items","anki","search"])
     document.getElementById("c-" + name).textContent = getList(name).filter(x => !x.done).length;
   document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("active", b.dataset.tab === todoTab));
@@ -1525,7 +1525,23 @@ function capLists() {
 addEventListener("resize", () => capLists());
 /* Items affichés : aujourd'hui puis les 7 derniers jours qui en ont, en une seule liste ;
    l'ordre choisi par glisser-déposer est gardé dans state.itemOrder (les items restent rangés par jour). */
-let itemDrag = false;
+let itemDrag = false, todoDrag = false;
+/* « À ajouter dans Anki » / « À creuser » : réordonner par glisser-déposer (au doigt : appui un peu long puis glisser) */
+if (window.Sortable) Sortable.create(document.getElementById("list-todo"), {
+  animation: 150, draggable: "li[data-id]", filter: "input,button", preventOnFilter: false,
+  delay: 250, delayOnTouchOnly: true, fallbackTolerance: 4,
+  onStart: () => { todoDrag = true; },
+  onEnd: () => {
+    todoDrag = false;
+    const name = todoTab, arr = state[name];
+    if (Array.isArray(arr)) {
+      const pos = new Map([...document.querySelectorAll("#list-todo li[data-id]")].map((li, i) => [li.dataset.id, i]));
+      arr.sort((a, b) => (pos.has(a.id) ? pos.get(a.id) : 1e9) - (pos.has(b.id) ? pos.get(b.id) : 1e9));
+      save();
+    }
+    renderLists();
+  }
+});
 function shownItems() {
   const today = dayKey(), days = [today, ...Object.keys(state.items).filter(k => k !== today && (state.items[k] || []).length).sort().reverse().slice(0, 7)];
   const all = days.flatMap(k => (state.items[k] || []).map(x => ({ ...x, day: k })));
