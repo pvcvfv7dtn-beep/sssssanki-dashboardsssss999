@@ -1443,7 +1443,11 @@ let listEditing = false;
 function renderLists() {
   if (listEditing) return;   // ne pas écraser un texte en cours de modification
   const today = dayKey();
-  document.getElementById("list-items").innerHTML = listHTML(getList("items"), "items", today);
+  if (!itemDrag) {
+    const shown = shownItems();
+    document.getElementById("list-items").innerHTML = shown.length ? shown.map(x => listHTML([x], "items", x.day)).join("") : listHTML([], "items", today);
+    document.getElementById("history").innerHTML = "";
+  }
   const isC = todoTab === "courses";
   for (const [id, show] of [["todoForm", !isC], ["list-todo", !isC], ["clearDone", !isC], ["courseForm", isC], ["list-courses", isC], ["addGroup", isC]])
     document.getElementById(id).hidden = !show;
@@ -1454,10 +1458,29 @@ function renderLists() {
   const f = document.getElementById("todoForm");
   if (!isC) { f.dataset.list = todoTab; f.querySelector("input").placeholder = placeholders[todoTab]; }
   renderCourses();
-  const past = Object.keys(state.items).filter(k => k !== today && state.items[k].length).sort().reverse().slice(0, 7);
-  document.getElementById("history").innerHTML = past.map(k =>
-    `<ul class="list">${listHTML(state.items[k], "items", k)}</ul>`).join("");   // jours précédents, sans en-tête de date
 }
+/* Items affichés : aujourd'hui puis les 7 derniers jours qui en ont, en une seule liste ;
+   l'ordre choisi par glisser-déposer est gardé dans state.itemOrder (les items restent rangés par jour). */
+let itemDrag = false;
+function shownItems() {
+  const today = dayKey(), days = [today, ...Object.keys(state.items).filter(k => k !== today && (state.items[k] || []).length).sort().reverse().slice(0, 7)];
+  const all = days.flatMap(k => (state.items[k] || []).map(x => ({ ...x, day: k })));
+  const ord = Array.isArray(state.itemOrder) ? state.itemOrder : [], pos = new Map(ord.map((id, i) => [id, i]));
+  if (!ord.length) return all;
+  const known = all.filter(x => pos.has(x.id)).sort((a, b) => pos.get(a.id) - pos.get(b.id));
+  const fresh = all.filter(x => !pos.has(x.id));   // pas encore placés : ceux du jour en tête, les autres à la suite
+  return [...fresh.filter(x => x.day === today), ...known, ...fresh.filter(x => x.day !== today)];
+}
+if (window.Sortable) Sortable.create(document.getElementById("list-items"), {
+  animation: 150, draggable: "li[data-id]", filter: "input,button", preventOnFilter: false,
+  delay: 250, delayOnTouchOnly: true, fallbackTolerance: 4,   // au doigt : appui un peu long puis glisser
+  onStart: () => { itemDrag = true; },
+  onEnd: () => {
+    itemDrag = false;
+    state.itemOrder = [...document.querySelectorAll("#list-items li[data-id]")].map(li => li.dataset.id);
+    save(); renderLists();
+  }
+});
 document.querySelectorAll("form.add").forEach(f => f.addEventListener("submit", e => {
   e.preventDefault();
   const inp = f.querySelector("input"), text = inp.value.trim();
