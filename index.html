@@ -685,6 +685,8 @@
   #vie .panel.reveal :is(.hd, .ghd, .pen, .tadd, [data-a^="addg-"]) { visibility:visible; }
   #vie .panel.reveal .add { display:block; }
   #vie .panel.reveal { box-shadow:0 0 0 1.5px color-mix(in srgb, var(--acc) 45%, transparent), 0 1px 3px rgba(0,0,0,.05); }
+  body.taskdrag #vie .tdl, body.taskdrag #vie .tdl:empty { display:block; min-height:44px; border:1.5px dashed color-mix(in srgb, var(--acc) 40%, transparent); border-radius:10px; }
+  body.taskdrag .ptodo { min-height:34px; border-radius:8px; outline:1.5px dashed rgba(47,111,222,.4); outline-offset:2px; }
   #vie .list[data-list="since"]:empty { display:none; }   /* groupe vide : pas de « Aucun élément » ni d'espace */
   #vie .vghost { font-size:12px; min-height:28px; padding:4px 9px; border-radius:8px; }
   #vie .late { font-size:11px; padding:1px 8px; }
@@ -2001,6 +2003,7 @@ byId("personForm").addEventListener("submit", e => {
 
 /* --- À faire --- */
 function renderPTodo() {
+  if (taskDrag) return;
   byId("ptodo").innerHTML = imp.todos.map(t =>
     `<li class="${t.done ? "ok" : ""}" data-tid="${t.id}"><span class="grip" title="Glisser pour réordonner">⠿</span><input class="pcheck" type="checkbox" ${t.done ? "checked" : ""} data-ptoggle="${t.id}" aria-label="Fait"><span class="txt" title="Double-clic pour modifier">${esc(t.text)}</span><button class="xbtn" type="button" data-ptedit="${t.id}" title="Modifier">✎</button><button class="xbtn" type="button" data-ptdel="${t.id}" title="Supprimer">✕</button></li>`
   ).join("");
@@ -2114,6 +2117,7 @@ byId("ptodo").addEventListener("click", e => { const b = e.target.closest("[data
 
 /* --- Glisser-déposer des tâches « Important » --- */
 byId("ptodo").addEventListener("pointerdown", e => {
+  if (window.Sortable) return;   // géré par Sortable (voir « Important ⇄ To-do »)
   const li = e.target.closest("li"); if (!li || e.button > 0 || e.target.closest(".pcheck,.xbtn,input")) return;
   if (e.pointerType === "touch" && !e.target.closest(".grip")) return;   // au doigt : on attrape la poignée
   const list = byId("ptodo"), from = [...list.children].indexOf(li), x0 = e.clientX, y0 = e.clientY;
@@ -2141,6 +2145,32 @@ byId("ptodo").addEventListener("pointerdown", e => {
     renderPTodo();
   };
   li.addEventListener("pointermove", move); li.addEventListener("pointerup", up); li.addEventListener("pointercancel", up);
+});
+
+/* --- Glisser-déposer des tâches : Important ⇄ To-do (partie Vie) ---
+   Les deux listes partagent le groupe Sortable « tasks » : on réordonne dans une liste ou on passe d'une liste à l'autre. */
+var taskDrag = false;
+function taskDragStart() { taskDrag = true; document.body.classList.add("taskdrag"); }
+function taskMoved(ev) {
+  taskDrag = false; document.body.classList.remove("taskdrag");
+  const kindOf = el => el.id === "ptodo" ? "imp" : "vie";
+  const list = k => k === "imp" ? imp.todos : (window.vieTodoItems ? window.vieTodoItems() : null);
+  const fk = kindOf(ev.from), tk = kindOf(ev.to), src = list(fk), dst = list(tk);
+  if (src && dst && ev.oldIndex != null && ev.newIndex != null && (fk !== tk || ev.oldIndex !== ev.newIndex)) {
+    const [t] = src.splice(ev.oldIndex, 1);
+    if (t) {
+      const item = fk === tk ? t : tk === "imp" ? { id: t.id, text: t.name, done: !!t.done } : { id: t.id, name: t.text, done: !!t.done };
+      dst.splice(Math.min(ev.newIndex, dst.length), 0, item);
+      save();
+    }
+  }
+  renderPTodo(); if (window.vieRender) window.vieRender();
+}
+if (window.Sortable) Sortable.create(byId("ptodo"), {
+  group: "tasks", animation: 150, fallbackTolerance: 4, draggable: "li",
+  handle: matchMedia("(hover: none)").matches ? ".grip" : null,   // au doigt : la poignée ⠿ ; à la souris : toute la ligne
+  filter: ".pcheck,.xbtn,input", preventOnFilter: false,
+  onStart: taskDragStart, onEnd: taskMoved
 });
 
 /* --- Glisser-déposer des prénoms --- */
@@ -3585,7 +3615,11 @@ function applyReveal(){app.querySelectorAll('.panel').forEach(p=>p.classList.tog
 function sortables(){
  if(!window.Sortable)return;
  const o=k=>({animation:150,fallbackTolerance:4,onStart:()=>{dragging=true},onEnd:()=>{dragging=false;rebuild(k)}});
- app.querySelectorAll('[data-list]').forEach(l=>Sortable.create(l,Object.assign(o(l.dataset.list),{group:l.dataset.list,handle:'.hd',draggable:{rec:'.rc',todo:'.td'}[l.dataset.list]||'.vtile'})));
+ app.querySelectorAll('[data-list]').forEach(l=>{
+  const k=l.dataset.list,opt=Object.assign(o(k),{group:k,handle:'.hd',draggable:{rec:'.rc',todo:'.td'}[k]||'.vtile'});
+  if(k==='todo')Object.assign(opt,{group:'tasks',onStart:()=>{dragging=true;taskDragStart()},
+   onEnd:ev=>{dragging=false;if(ev.from!==ev.to)taskMoved(ev);else{taskDrag=false;document.body.classList.remove('taskdrag');rebuild('todo')}}});
+  Sortable.create(l,opt)});
  app.querySelectorAll('[data-glist]').forEach(l=>Sortable.create(l,Object.assign(o(l.dataset.glist),{handle:'.ghd'})));
 }
 function rebuild(k){
@@ -3680,7 +3714,7 @@ function act(a,v){
  if(a==='addg-todo')openForm('g-todo');
  if(a==='add-todo'){const i=app.querySelector('.qadd input');if(i)i.focus()}
  if(a==='clrdone'){const prev=JSON.stringify(S().todo);S().todo.forEach(g=>{g.items=g.items.filter(i=>!i.done)});changed();toast('Tâches cochées effacées',()=>{S().todo=JSON.parse(prev);changed()})}
- if(a==='rmode'){ui.rmode=v;ui.rec=true;saveUi();render()}
+ if(a==='rmode'){if(touchUI.matches&&ui.rmode===v&&ui.rec){revealed=revealed==='p-rec'?null:'p-rec';applyReveal();return}ui.rmode=v;ui.rec=true;saveUi();render()}
  if(a==='ledit'){ui.ledit=!ui.ledit;saveUi();render()}
  if(a==='recfold'){ui.rec=!ui.rec;saveUi();render()}
  if(a==='arch'){const c=S().cd.find(x=>x.id===v);if(c){c.arch=true;changed();toast('Archivée',()=>{c.arch=false;changed()})}}
@@ -3721,7 +3755,8 @@ function changed(){
  render();
 }
 document.addEventListener('pointerdown',e=>{if(revealed&&!e.target.closest('#vapp .panel,#vmodal')){revealed=null;applyReveal()}});
-window.vieRender=()=>{if(!modalOpen&&!dragging)render()};
+window.vieRender=()=>{if(!modalOpen&&!dragging&&!taskDrag)render()};
+window.vieTodoItems=()=>S().todo[0].items;
 render();
 setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
 
