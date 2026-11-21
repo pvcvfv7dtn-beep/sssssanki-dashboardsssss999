@@ -2521,6 +2521,13 @@ function initSyncUI() {
   const importText = txt => {
     let obj; try { obj = JSON.parse(txt); if (typeof obj === "string") obj = JSON.parse(obj); } catch { alert("Ce texte n'est pas un export valide."); return; }
     if (obj && obj.state && obj.state.data && typeof obj.state.data === "object") obj = obj.state.data;   // sauvegarde automatique du Mac (copie brute de Supabase)
+    /* import partiel : seulement des liens de cours ({"courses":[…]}) -> ajoutés à ceux existants, rien d'autre ne change */
+    if (obj && Array.isArray(obj.courses) && Object.keys(obj).length === 1) {
+      const have = new Set(state.courses.map(x => x.id)), add = obj.courses.filter(x => x && x.id && (x.url || x.g) && !have.has(x.id));
+      if (!add.length) { alert("Ces liens de cours sont déjà présents."); return; }
+      if (!confirm(`Ajouter ${add.length} lien${add.length > 1 ? "s" : ""} de cours ? (rien d'autre n'est modifié)`)) return;
+      state.courses.push(...add); save(); renderLists(); alert(`${add.length} lien${add.length > 1 ? "s" : ""} de cours restauré${add.length > 1 ? "s" : ""} ✓`); return;
+    }
     if (!obj || typeof obj !== "object" || !("goals" in obj || "imp" in obj || "items" in obj)) { alert("Ce JSON ne ressemble pas à un export du dashboard."); return; }
     if (!confirm("Remplacer toutes les données de cet appareil (et du cloud) par cet import ?")) return;
     applyState(obj); save();
