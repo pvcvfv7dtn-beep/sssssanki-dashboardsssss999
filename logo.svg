@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#252c40"/><stop offset="1" stop-color="#151a26"/></linearGradient></defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <g fill="none" stroke-width="36" stroke-linecap="round"><path d="M 126.1 347.0 A 150 150 0 0 1 106.4 260.5" stroke="#5e9bff"/><path d="M 116.3 217.3 A 150 150 0 0 1 171.7 147.9" stroke="#7fb0ff"/><path d="M 211.6 128.7 A 150 150 0 0 1 300.4 128.7" stroke="#4cc38a"/><path d="M 340.3 147.9 A 150 150 0 0 1 395.7 217.3" stroke="#f5a623"/><path d="M 405.6 260.5 A 150 150 0 0 1 385.9 347.0" stroke="#f2734d"/></g>
+  <g><rect x="180" y="296" width="40" height="64" rx="12" fill="#f2a043"/><rect x="236" y="256" width="40" height="104" rx="12" fill="#4cc38a"/><rect x="292" y="212" width="40" height="148" rx="12" fill="#5e9bff"/></g>
+  <polyline points="200,262 256,222 312,178 322,176" fill="none" stroke="#f2f2f7" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#f2f2f7" stroke="#1a2030" stroke-width="7"><circle cx="200" cy="262" r="13"/><circle cx="256" cy="222" r="13"/><circle cx="312" cy="178" r="13"/></g>
+  <circle cx="322" cy="176" r="19" fill="#f5a623" stroke="#1a2030" stroke-width="7"/>
+  <rect x="166" y="402" width="180" height="20" rx="10" fill="#f2f2f7" opacity=".85"/>
+</svg>

@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Anki EDN">
 <meta name="theme-color" content="#f3f2ee">
 <title>Anki Tracker – EDN</title>
-<link rel="icon" id="favicon" href="data:,">
+<link rel="icon" id="favicon" href="logo.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
@@ -1323,6 +1323,7 @@ function drawFavicon(prog, neg, min, started) {
   const p = Math.round(prog * 60) / 60;               // 60 crans suffisent à 16 px
   const key = [p, col, min, started, pomo.running].join("|");
   if (key === favKey) return; favKey = key;
+  if (!started) { const f = document.getElementById("favicon"); f.type = "image/svg+xml"; f.href = "logo.svg"; return; }   // minuteur pas lancé : le logo
   const c = favCanvas.getContext("2d");
   c.clearRect(0, 0, 64, 64); c.lineCap = "round"; c.lineWidth = 8;
   c.beginPath(); c.arc(32, 32, 27, 0, 2 * Math.PI); c.strokeStyle = "rgba(128,128,128,.38)"; c.stroke();
@@ -1335,7 +1336,7 @@ function drawFavicon(prog, neg, min, started) {
     c.font = `700 ${t.length > 2 ? 22 : 30}px -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif`;
     c.fillText(t, 32, 34);
   }
-  document.getElementById("favicon").href = favCanvas.toDataURL("image/png");
+  const fav = document.getElementById("favicon"); fav.type = "image/png"; fav.href = favCanvas.toDataURL("image/png");
 }
 function tickPomo() {
   /* fin du temps prévu : le chrono continue en négatif (travail comme pause) jusqu'à « pause » ou « passer » */
