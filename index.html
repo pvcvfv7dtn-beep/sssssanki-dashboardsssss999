@@ -3697,7 +3697,7 @@ function findIt(gs,id){for(const g of gs){const i=g.items.findIndex(x=>x.id===id
 
 function grp(kind,g,inner,after){
  const sh=!!ui.shut[g.id],tl=kind==='since'||kind==='links';
- return `<div class="grp" data-g="${g.id}"><div class="gh${g.name?'':' nog'}" data-tap="gtog" data-edit="g-${kind}:${g.id}"><span class="ghd" aria-label="Déplacer le groupe">⠿</span><b>${esc(g.name)}</b>${kind==='since'?penAdd('g-since:'+g.id,'add-since',g.id):pen('g-'+kind+':'+g.id)}<span class="cnt">${g.items.length}</span><span class="chev">${sh?'▸':'▾'}</span></div><div class="list${tl?' tiles':''}${kind==='todo'?' tdl':''}${sh?' shut':''}" data-list="${kind}">${inner}${kind==='links'?`<button class="tadd" data-a="add-${kind}" data-v="${g.id}" aria-label="Ajouter">+</button>`:''}</div>${sh?'':(after!=null?after:(tl?'':`<button class="add" data-a="add-${kind}" data-v="${g.id}">+ Ajouter</button>`))}</div>`;
+ return `<div class="grp" data-g="${g.id}"><div class="gh${g.name?'':' nog'}" data-tap="gtog" data-edit="g-${kind}:${g.id}">${kind==='since'?'':'<span class="ghd" aria-label="Déplacer le groupe">⠿</span>'}<b>${esc(g.name)}</b>${kind==='since'?penAdd('g-since:'+g.id,'add-since',g.id):pen('g-'+kind+':'+g.id)}<span class="cnt">${g.items.length}</span><span class="chev">${sh?'▸':'▾'}</span></div><div class="list${tl?' tiles':''}${kind==='todo'?' tdl':''}${sh?' shut':''}" data-list="${kind}">${inner}${kind==='links'?`<button class="tadd" data-a="add-${kind}" data-v="${g.id}" aria-label="Ajouter">+</button>`:''}</div>${sh?'':(after!=null?after:(tl?'':`<button class="add" data-a="add-${kind}" data-v="${g.id}">+ Ajouter</button>`))}</div>`;
 }
 function vSince(){
  const t=today();let late=0;
@@ -3801,7 +3801,7 @@ function sortables(){
   if(k==='todo')Object.assign(opt,{group:'tasks',onStart:()=>{dragging=true;taskDragStart()},
    onEnd:ev=>{dragging=false;if(ev.from!==ev.to)taskMoved(ev);else{taskDrag=false;document.body.classList.remove('taskdrag');rebuild('todo')}}});
   Sortable.create(l,opt)});
- app.querySelectorAll('[data-glist]').forEach(l=>Sortable.create(l,Object.assign(o(l.dataset.glist),{handle:'.ghd',draggable:'.grp'})));
+ app.querySelectorAll('[data-glist]').forEach(l=>Sortable.create(l,Object.assign(o(l.dataset.glist),{handle:l.dataset.glist==='since'?'.gh':'.ghd',draggable:'.grp',delay:220,delayOnTouchOnly:true})));   // Temps depuis : on attrape le titre du groupe
 }
 function rebuild(k){
  const all={},byG={};S()[k].forEach(g=>{byG[g.id]=g;g.items.forEach(i=>{all[i.id]=i})});
