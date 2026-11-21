@@ -3987,6 +3987,7 @@ function act(a,v){
 app.addEventListener('submit',e=>{
  const f=e.target.closest('.qadd');if(!f)return;e.preventDefault();
  const inp=f.querySelector('input'),t=inp.value.trim(),g=S().todo.find(x=>x.id===f.dataset.g);if(!t||!g)return;
+ inp.value='';                                   // vider le champ avant le réaffichage (qui garde sinon le texte tapé)
  g.items.push({id:uid(),name:t,done:false});changed();
  const ni=app.querySelector(`.qadd[data-g="${g.id}"] input`);if(ni)ni.focus();
 });
