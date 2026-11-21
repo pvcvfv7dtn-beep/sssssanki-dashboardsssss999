@@ -1460,8 +1460,16 @@ function renderLists() {
   document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("active", b.dataset.tab === todoTab));
   const f = document.getElementById("todoForm");
   if (!isC) { f.dataset.list = todoTab; f.querySelector("input").placeholder = placeholders[todoTab]; }
-  renderCourses();
+  renderCourses(); capLists();
 }
+/* « À ajouter dans Anki » / « À creuser » / « Liens de cours » : 6 lignes visibles au maximum, le reste en défilant */
+function capLists() {
+  const sc = document.querySelector(".a-lists .scroll"); if (!sc) return;
+  sc.style.maxHeight = "";
+  const ul = [...sc.querySelectorAll("ul")].find(u => !u.hidden), lis = ul ? [...ul.children] : [];
+  if (lis.length > 6) sc.style.maxHeight = Math.round(lis[6].getBoundingClientRect().top - lis[0].getBoundingClientRect().top) + "px";
+}
+addEventListener("resize", () => capLists());
 /* Items affichés : aujourd'hui puis les 7 derniers jours qui en ont, en une seule liste ;
    l'ordre choisi par glisser-déposer est gardé dans state.itemOrder (les items restent rangés par jour). */
 let itemDrag = false;
@@ -1496,7 +1504,7 @@ document.addEventListener("click", e => {
   if (t.matches && t.matches("[data-toggle]")) {
     const li = t.closest("li"), id = li.dataset.id;
     if (openIds.has(id)) openIds.delete(id); else openIds.add(id);
-    li.classList.toggle("open");
+    li.classList.toggle("open"); capLists();
     return;
   }
   if (t.dataset.act) {
@@ -1739,7 +1747,7 @@ function renderCourses() {
         <button class="ghost del" data-cact="del" type="button" title="Retirer">✕</button></li>`;
     }
   });
-  ul.innerHTML = html;
+  ul.innerHTML = html; capLists();
 }
 function cFormHint() {
   const g = cTarget && state.courses[cIdx(cTarget)];
