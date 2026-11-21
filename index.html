@@ -687,6 +687,13 @@
   #vie .panel.reveal { box-shadow:0 0 0 1.5px color-mix(in srgb, var(--acc) 45%, transparent), 0 1px 3px rgba(0,0,0,.05); }
   body.taskdrag #vie .tdl, body.taskdrag #vie .tdl:empty { display:block; min-height:44px; border:1.5px dashed color-mix(in srgb, var(--acc) 40%, transparent); border-radius:10px; }
   body.taskdrag .ptodo { min-height:34px; border-radius:8px; outline:1.5px dashed rgba(47,111,222,.4); outline-offset:2px; }
+  #vie .sheet .todorow { display:flex; align-items:center; gap:10px; margin:10px 0 4px; }
+  #vie .sheet .todorow label.chk { margin:0; }
+  #vie .sheet .jlead { display:inline-flex; align-items:center; gap:4px; font-size:13px; font-weight:600; color:var(--mute); }
+  #vie .sheet .jlead input { width:56px !important; padding:4px 6px !important; font-size:14px !important; text-align:center; }
+  #vie .td.early .tn, #vie .td.early .ck { opacity:.45; }
+  #vie .td .jx2 { margin-left:6px; font-size:11px; font-weight:600; color:var(--mute); font-variant-numeric:tabular-nums; }
+  .ptodo li.early .txt, .ptodo li.early .pcheck { opacity:.45; }
   #vie .list[data-list="since"]:empty { display:none; }   /* groupe vide : pas de « Aucun élément » ni d'espace */
   #vie .vghost { font-size:12px; min-height:28px; padding:4px 9px; border-radius:8px; }
   #vie .late { font-size:11px; padding:1px 8px; }
@@ -2002,10 +2009,12 @@ byId("personForm").addEventListener("submit", e => {
 });
 
 /* --- À faire --- */
+/* tâche arrivée en avance (compte à rebours) : grisée jusqu'au jour J ; renvoie le nombre de jours restants */
+function early(t) { if (!t.due || t.done) return 0; const n = dayDiff(new Date(t.due + "T12:00"), new Date()); return n > 0 ? n : 0; }
 function renderPTodo() {
   if (taskDrag) return;
   byId("ptodo").innerHTML = imp.todos.map(t =>
-    `<li class="${t.done ? "ok" : ""}" data-tid="${t.id}"><span class="grip" title="Glisser pour réordonner">⠿</span><input class="pcheck" type="checkbox" ${t.done ? "checked" : ""} data-ptoggle="${t.id}" aria-label="Fait"><span class="txt" title="Double-clic pour modifier">${esc(t.text)}</span><button class="xbtn" type="button" data-ptedit="${t.id}" title="Modifier">✎</button><button class="xbtn" type="button" data-ptdel="${t.id}" title="Supprimer">✕</button></li>`
+    `<li class="${t.done ? "ok" : ""}${early(t) ? " early" : ""}" data-tid="${t.id}" ${early(t) ? `title="Échéance dans ${early(t)} j"` : ""}><span class="grip" title="Glisser pour réordonner">⠿</span><input class="pcheck" type="checkbox" ${t.done ? "checked" : ""} data-ptoggle="${t.id}" aria-label="Fait"><span class="txt" title="Double-clic pour modifier">${esc(t.text)}</span><button class="xbtn" type="button" data-ptedit="${t.id}" title="Modifier">✎</button><button class="xbtn" type="button" data-ptdel="${t.id}" title="Supprimer">✕</button></li>`
   ).join("");
   byId("ptodoClear").hidden = !imp.todos.some(t => t.done);
 }
@@ -3593,7 +3602,7 @@ function reconcileAuto(){
   if(tasks.some(x=>x.done)){if(i.cdDone!==due){i.cdDone=due;ch=true}}
   else if(tasks.length&&i.cdDone===due){delete i.cdDone;ch=true}
   if(i.cdNoTodo){if(dropUndone(i.id,due)||i.cdTodo===due){if(i.cdTodo===due)delete i.cdTodo;ch=true}return}
-  if(t>=due&&i.cdTodo!==due&&i.cdDone!==due){
+  if(t>=addDays(due,-(i.cdLead||0))&&i.cdTodo!==due&&i.cdDone!==due){
    for(const L of [vt,it])for(let k=L.length-1;k>=0;k--)if(L[k].src===i.id&&L[k].due!==due&&!L[k].done)L.splice(k,1);   // tâche d'un cycle précédent jamais faite
    if(!all().some(x=>x.id===tid))vt.push({id:tid,name:i.cdName||i.name,done:false,src:i.id,due});
    i.cdTodo=due;ch=true;
@@ -3606,7 +3615,7 @@ function reconcileAuto(){
   if(tasks.some(x=>x.done)){if(!c.arch){c.arch=true;c.archBy='todo';ch=true}}
   else if(tasks.length&&c.arch&&c.archBy==='todo'){c.arch=false;delete c.archBy;ch=true}
   if(c.noTodo){if(dropUndone(src,due)||c.todo===due){if(c.todo===due)delete c.todo;ch=true}return}
-  if(t>=due&&c.todo!==due&&!c.arch){
+  if(t>=addDays(due,-(c.lead||0))&&c.todo!==due&&!c.arch){
    for(const L of [vt,it])for(let k=L.length-1;k>=0;k--)if(L[k].src===src&&L[k].due!==due&&!L[k].done)L.splice(k,1);
    if(!all().some(x=>x.id===tid))vt.push({id:tid,name:c.name,done:false,src,due});
    c.todo=due;ch=true;
@@ -3629,7 +3638,7 @@ function vLinks(){
 }
 function vTodo(){
  const g=S().todo[0];
- return `<div class="grp" data-g="${g.id}"><form class="qadd" data-g="${g.id}"><input placeholder="Ajouter une tâche" aria-label="Ajouter une tâche" enterkeyhint="done"><button class="qbtn" aria-label="Ajouter">+</button></form><div class="list tdl" data-list="todo">${g.items.map(t=>`<div class="td${t.done?' vdone':''}" data-id="${t.id}" data-tap="tdo" data-edit="todo:${t.id}"><span class="ck">${t.done?'✓':''}</span><span class="tn">${esc(t.name)}</span><span class="hd" aria-label="Déplacer">⠿</span></div>`).join('')}</div></div>`;
+ return `<div class="grp" data-g="${g.id}"><form class="qadd" data-g="${g.id}"><input placeholder="Ajouter une tâche" aria-label="Ajouter une tâche" enterkeyhint="done"><button class="qbtn" aria-label="Ajouter">+</button></form><div class="list tdl" data-list="todo">${g.items.map(t=>`<div class="td${t.done?' vdone':''}${t.due&&!t.done&&today()<t.due?' early':''}" data-id="${t.id}" data-tap="tdo" data-edit="todo:${t.id}"><span class="ck">${t.done?'✓':''}</span><span class="tn">${esc(t.name)}${t.due&&!t.done&&today()<t.due?`<span class="jx2">J-${diff(t.due,today())}</span>`:''}</span><span class="hd" aria-label="Déplacer">⠿</span></div>`).join('')}</div></div>`;
 }
 function vRec(){
  const m=['todo','rec','links'].includes(ui.rmode)?ui.rmode:'todo',n=S()[m].reduce((a,g)=>a+g.items.filter(i=>!i.done).length,0);
@@ -3682,9 +3691,9 @@ function openForm(kind,id,gid){
  if(kind==='since'||kind==='rec'||kind==='links'||kind==='todo'){const[g,i]=findIt(S()[kind],id);if(g){x=g.items[i];gid=g.id}}
  if(kind==='cd')x=S().cd.find(c=>c.id===id)||{};
  if(kind.startsWith('g-'))x=S()[kind.slice(2)].find(g=>g.id===id)||{};
- if(kind==='since'){title=id?'Modifier':'Nouvel élément';f=`<label for="f-name">Nom</label><input id="f-name" required value="${esc(x.name)}"><label for="f-g">Groupe</label><select id="f-g">${opts(S().since,gid)}</select><label for="f-freq">Fréquence cible (jours, facultatif)</label><input id="f-freq" type="number" min="1" inputmode="numeric" placeholder="ex. 14" value="${x.freq||''}"><label for="f-cd">Compte à rebours après la dernière fois (jours, facultatif)</label><input id="f-cd" type="number" min="1" inputmode="numeric" placeholder="ex. 28" value="${x.cdDays||''}"><label for="f-cdname">Nom du compte à rebours (facultatif)</label><input id="f-cdname" placeholder="${esc(x.name||'même nom')}" value="${esc(x.cdName||'')}"><label class="chk"><input id="f-cdtodo" type="checkbox"${x.cdNoTodo?'':' checked'}> Ajouter à la To-do le jour J</label><label for="f-last">Dernière fois</label><input id="f-last" type="date" max="${today()}" value="${x.last||''}"><div class="quick"><button type="button" data-a="setd" data-v="0">Aujourd'hui</button><button type="button" data-a="setd" data-v="1">Hier</button><button type="button" data-a="setd" data-v="2">Avant-hier</button><button type="button" data-a="setd" data-v="-1">Jamais</button></div>`}
+ if(kind==='since'){title=id?'Modifier':'Nouvel élément';f=`<label for="f-name">Nom</label><input id="f-name" required value="${esc(x.name)}"><label for="f-g">Groupe</label><select id="f-g">${opts(S().since,gid)}</select><label for="f-freq">Fréquence cible (jours, facultatif)</label><input id="f-freq" type="number" min="1" inputmode="numeric" placeholder="ex. 14" value="${x.freq||''}"><label for="f-cd">Compte à rebours après la dernière fois (jours, facultatif)</label><input id="f-cd" type="number" min="1" inputmode="numeric" placeholder="ex. 28" value="${x.cdDays||''}"><label for="f-cdname">Nom du compte à rebours (facultatif)</label><input id="f-cdname" placeholder="${esc(x.name||'même nom')}" value="${esc(x.cdName||'')}"><div class="todorow"><label class="chk"><input id="f-cdtodo" type="checkbox"${x.cdNoTodo?'':' checked'}> Ajouter à la To-do le jour J</label><span class="jlead">J −<input id="f-lead" type="number" min="0" max="365" inputmode="numeric" placeholder="0" value="${x.cdLead||''}" aria-label="Jours d'avance"></span></div><label for="f-last">Dernière fois</label><input id="f-last" type="date" max="${today()}" value="${x.last||''}"><div class="quick"><button type="button" data-a="setd" data-v="0">Aujourd'hui</button><button type="button" data-a="setd" data-v="1">Hier</button><button type="button" data-a="setd" data-v="2">Avant-hier</button><button type="button" data-a="setd" data-v="-1">Jamais</button></div>`}
  if(kind==='rec'){title=id?'Modifier la recette':'Nouvelle recette';f=`<label for="f-name">Titre</label><input id="f-name" required value="${esc(x.name)}"><label for="f-ing">Ingrédients (un par ligne)</label><textarea id="f-ing">${esc(x.ing)}</textarea><label for="f-steps">Étapes (une par ligne)</label><textarea id="f-steps">${esc(x.steps)}</textarea><label for="f-link">Lien (facultatif)</label><input id="f-link" type="url" placeholder="https://" value="${esc(x.link)}">`}
- if(kind==='cd'){title=id?'Modifier la date':'Nouvelle date';f=`<label for="f-name">Nom</label><input id="f-name" required placeholder="ex. Vacances" value="${esc(x.name)}"><label for="f-date">Date</label><input id="f-date" type="date" required value="${x.date||today()}"><label class="chk"><input id="f-todo" type="checkbox"${x.noTodo?'':' checked'}> Ajouter à la To-do le jour J</label>${id?`<label class="chk"><input id="f-arch" type="checkbox"${x.arch?' checked':''}> Archivée</label>`:''}`}
+ if(kind==='cd'){title=id?'Modifier la date':'Nouvelle date';f=`<label for="f-name">Nom</label><input id="f-name" required placeholder="ex. Vacances" value="${esc(x.name)}"><label for="f-date">Date</label><input id="f-date" type="date" required value="${x.date||today()}"><div class="todorow"><label class="chk"><input id="f-todo" type="checkbox"${x.noTodo?'':' checked'}> Ajouter à la To-do le jour J</label><span class="jlead">J −<input id="f-lead" type="number" min="0" max="365" inputmode="numeric" placeholder="0" value="${x.lead||''}" aria-label="Jours d'avance"></span></div>${id?`<label class="chk"><input id="f-arch" type="checkbox"${x.arch?' checked':''}> Archivée</label>`:''}`}
  if(kind==='todo'){title=id?'Modifier la tâche':'Nouvelle tâche';f=`<label for="f-name">Tâche</label><input id="f-name" required value="${esc(x.name)}">`}
  if(kind==='links'){title=id?'Modifier le lien':'Nouveau lien';f=`<label for="f-name">Nom</label><input id="f-name" required placeholder="ex. Ameli" value="${esc(x.name)}"><label for="f-url">Adresse</label><input id="f-url" required type="text" inputmode="url" autocapitalize="off" placeholder="ex. ameli.fr" value="${esc(x.url)}">`}
  if(kind==='title'){title='Renommer le bloc';f=`<label for="f-name">Titre</label><input id="f-name" required value="${TT(id)}">`}
@@ -3718,13 +3727,13 @@ M.addEventListener('submit',e=>{
   if(g){it=g.items[i];if(g!==ng){g.items.splice(i,1);ng.items.push(it)}}
   else{it={id:uid()};ng.items.push(it)}
   it.name=name;
-  if(k==='since'){it.freq=parseInt(v('#f-freq'))||null;it.cdDays=parseInt(v('#f-cd'))||0;it.cdName=v('#f-cd')?v('#f-cdname'):'';it.cdNoTodo=!$('#f-cdtodo').checked;const nl=v('#f-last')||null;if(nl!==it.last){it.last=nl;it.at=null}}
+  if(k==='since'){it.freq=parseInt(v('#f-freq'))||null;it.cdDays=parseInt(v('#f-cd'))||0;it.cdName=v('#f-cd')?v('#f-cdname'):'';it.cdNoTodo=!$('#f-cdtodo').checked;it.cdLead=Math.max(0,parseInt(v('#f-lead'))||0);const nl=v('#f-last')||null;if(nl!==it.last){it.last=nl;it.at=null}}
   else if(k==='todo'){}
   else if(k==='links'){let u=v('#f-url');if(u&&!/^[a-z]+:\/\//i.test(u))u='https://'+u;it.url=u}
   else{it.ing=$('#f-ing').value;it.steps=$('#f-steps').value;it.link=v('#f-link')}
  }
  if(k==='title')S().titles[id]=name;
- if(k==='cd'){const date=v('#f-date');if(!date)return;let c=S().cd.find(x=>x.id===id);if(!c){c={id:uid(),arch:false};S().cd.push(c)}c.name=name;c.date=date;c.noTodo=!$('#f-todo').checked;const ar=$('#f-arch');if(ar)c.arch=ar.checked}
+ if(k==='cd'){const date=v('#f-date');if(!date)return;let c=S().cd.find(x=>x.id===id);if(!c){c={id:uid(),arch:false};S().cd.push(c)}c.name=name;c.date=date;c.noTodo=!$('#f-todo').checked;c.lead=Math.max(0,parseInt(v('#f-lead'))||0);const ar=$('#f-arch');if(ar)c.arch=ar.checked}
  if(k.startsWith('g-')){const gs=S()[k.slice(2)];let g=gs.find(x=>x.id===id);if(!g){g={id:uid(),items:[]};gs.push(g)}g.name=name}
  closeForm();changed();
 });
