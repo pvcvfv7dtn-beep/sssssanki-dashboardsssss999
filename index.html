@@ -700,8 +700,19 @@
   #vie .td .jx2 { margin-left:6px; font-size:11px; font-weight:600; color:var(--mute); font-variant-numeric:tabular-nums; }
   .ptodo li.early .txt, .ptodo li.early .pcheck { opacity:.45; }
   /* Temps depuis : les groupes (Chambre / Commun / Plantes…) côte à côte, en colonnes qui passent à la ligne sur petit écran */
-  #vie [data-glist="since"] { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:4px 22px; align-items:start; }
-  #vie [data-glist="since"] > .grp { margin-bottom:0; min-width:0; }
+  #vie [data-glist="since"] { display:grid; gap:4px 22px; align-items:start; }
+  #vie [data-glist="since"] > .grp { margin-bottom:0; min-width:0; position:relative; }
+  /* barre de réglage entre deux colonnes */
+  #vie .colgrip { position:absolute; top:0; bottom:0; right:-16px; width:10px; cursor:col-resize; touch-action:none; z-index:2; }
+  #vie .colgrip::after { content:""; position:absolute; top:4px; bottom:4px; left:4px; width:2px; border-radius:2px; background:var(--mute); opacity:0; transition:opacity .15s, background .15s; }
+  @media (hover: hover) { #vie .panel:hover .colgrip::after { opacity:.25; } }
+  #vie .panel.reveal .colgrip::after { opacity:.3; }
+  #vie .colgrip:hover::after, #vie .colgrip.on::after { opacity:1; background:var(--acc); }
+  body.colresize, body.colresize * { cursor:col-resize !important; user-select:none !important; }
+  @media (max-width: 760px) { #vie [data-glist="since"] { grid-template-columns:1fr !important; } #vie .colgrip { display:none; } }
+  /* tuiles : nom sur 2 lignes au besoin, pour que deux tuiles tiennent côte à côte */
+  #vie #p-since .tiles > .vtile { max-width:max(calc(50% - 3px), min(100%, 150px)); }
+  #vie #p-since .vtile b { white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.2; overflow-wrap:anywhere; }
   #vie [data-glist="since"] > .grp:has(> .gh.nog):has(> .list:empty) { display:none; }   /* groupe sans nom et vide : pas de colonne vide */
   #vie .list[data-list="since"]:empty { display:none; }   /* groupe vide : pas de « Aucun élément » ni d'espace */
   #vie .vghost { font-size:12px; min-height:28px; padding:4px 9px; border-radius:8px; }
@@ -3690,15 +3701,18 @@ function grp(kind,g,inner,after){
 }
 function vSince(){
  const t=today();let late=0;
+ const vis=S().since.filter(g=>g.name||g.items.length);   // groupes affichés en colonnes (un groupe sans nom et vide ne prend pas de place)
  const gs=S().since.map(g=>{
   const tiles=g.items.map(it=>{
    const d=it.last?diff(t,it.last):null;let c='';
    if(d!==null&&it.freq){const r=d/it.freq;c=r>=1?'bad':r>=.75?'mid':'good';if(r>=1)late++}
    return `<div class="vtile ${c}" data-id="${it.id}" data-tap="reset" data-edit="since:${it.id}" title="${it.freq?'Tous les '+it.freq+' j':''}"><span class="hd" aria-label="Déplacer">⠿</span><b>${esc(it.name)}</b><small>${d===null?'–':'J'+d}${it.freq?'<span class="fq"> / '+it.freq+'</span>':''}</small></div>`}).join('');
   const lg=g.items.filter(i=>i.last).sort((x,y)=>(y.at||+pd(y.last))-(x.at||+pd(x.last))).slice(0,3);
-  return grp('since',g,tiles,lg.length?'<div class="log">'+lg.map(i=>`<div><span>${esc(i.name)}</span><span>${i.at&&iso(new Date(i.at))===i.last?hm(i.at):fdate(i.last)}</span></div>`).join('')+'</div>':'');
+  const isLast=vis.length&&vis[vis.length-1]===g,grip=vis.includes(g)&&!isLast?`<div class="colgrip" data-g="${g.id}" title="Glisser pour élargir / amincir · double-clic pour égaliser"></div>`:'';
+  return grp('since',g,tiles,(lg.length?'<div class="log">'+lg.map(i=>`<div><span>${esc(i.name)}</span><span>${i.at&&iso(new Date(i.at))===i.last?hm(i.at):fdate(i.last)}</span></div>`).join('')+'</div>':'')+grip);
  }).join('');
- return `<section class="panel${ui.tab==='since'?' act':''}" id="p-since"><div class="ph"><h2>${TT('since')}</h2>${penAdd('title:since','add-since')}${late?`<span class="late">${late} en retard</span>`:''}<button class="vghost" data-a="addg-since">+ Groupe</button></div><div data-glist="since">${gs}</div></section>`;
+ const cw=S().sinceCols||{},tpl=vis.map(g=>`minmax(0,${(+cw[g.id]>0?+cw[g.id]:1).toFixed(3)}fr)`).join(' ');
+ return `<section class="panel${ui.tab==='since'?' act':''}" id="p-since"><div class="ph"><h2>${TT('since')}</h2>${penAdd('title:since','add-since')}${late?`<span class="late">${late} en retard</span>`:''}<button class="vghost" data-a="addg-since">+ Groupe</button></div><div data-glist="since" style="grid-template-columns:${tpl||'1fr'}">${gs}</div></section>`;
 }
 function human(n){if(n>=60)return'≈ '+Math.round(n/30.44)+' mois';if(n>=14)return Math.floor(n/7)+' sem.'+(n%7?' et '+n%7+' j':'');return''}
 function cdCard(c,t){
@@ -3786,7 +3800,7 @@ function sortables(){
   if(k==='todo')Object.assign(opt,{group:'tasks',onStart:()=>{dragging=true;taskDragStart()},
    onEnd:ev=>{dragging=false;if(ev.from!==ev.to)taskMoved(ev);else{taskDrag=false;document.body.classList.remove('taskdrag');rebuild('todo')}}});
   Sortable.create(l,opt)});
- app.querySelectorAll('[data-glist]').forEach(l=>Sortable.create(l,Object.assign(o(l.dataset.glist),{handle:'.ghd'})));
+ app.querySelectorAll('[data-glist]').forEach(l=>Sortable.create(l,Object.assign(o(l.dataset.glist),{handle:'.ghd',draggable:'.grp'})));
 }
 function rebuild(k){
  const all={},byG={};S()[k].forEach(g=>{byG[g.id]=g;g.items.forEach(i=>{all[i.id]=i})});
@@ -3893,6 +3907,26 @@ app.addEventListener('submit',e=>{
  g.items.push({id:uid(),name:t,done:false});changed();
  const ni=app.querySelector(`.qadd[data-g="${g.id}"] input`);if(ni)ni.focus();
 });
+/* Temps depuis : barre entre deux colonnes à glisser pour régler leur largeur (enregistrée et synchronisée) ; double-clic = colonnes égales */
+app.addEventListener('pointerdown',e=>{
+ const gr=e.target.closest('.colgrip');if(!gr)return;
+ e.preventDefault();e.stopPropagation();
+ const now=Date.now();if(now-lastGripDown<380){lastGripDown=0;S().sinceCols={};changed();return}lastGripDown=now;   // double-clic : colonnes égales
+ const list=gr.closest('[data-glist]'),cols=[...list.children].filter(c=>c.classList.contains('grp')&&getComputedStyle(c).display!=='none');
+ const i=cols.indexOf(gr.closest('.grp'));if(i<0||i>=cols.length-1)return;
+ const w=cols.map(c=>c.getBoundingClientRect().width),a=w[i],b=w[i+1],x0=e.clientX,MIN=110;
+ try{gr.setPointerCapture(e.pointerId)}catch(_){}
+ dragging=true;gr.classList.add('on');document.body.classList.add('colresize');
+ const apply=()=>{list.style.gridTemplateColumns=w.map(x=>`minmax(0,${x.toFixed(1)}fr)`).join(' ')};
+ const mv=ev=>{const d=Math.max(MIN-a,Math.min(b-MIN,ev.clientX-x0));w[i]=a+d;w[i+1]=b-d;apply()};
+ const up=()=>{gr.removeEventListener('pointermove',mv);gr.removeEventListener('pointerup',up);gr.removeEventListener('pointercancel',up);
+  dragging=false;gr.classList.remove('on');document.body.classList.remove('colresize');
+  if(w[i]===a)return;   // simple clic : rien à enregistrer
+  lastGripDown=0;
+  const avg=w.reduce((s,x)=>s+x,0)/w.length,cw={};cols.forEach((c,k)=>cw[c.dataset.g]=+(w[k]/avg).toFixed(3));S().sinceCols=cw;changed()};
+ gr.addEventListener('pointermove',mv);gr.addEventListener('pointerup',up);gr.addEventListener('pointercancel',up);
+},true);
+let lastGripDown=0;
 let lp=null,lpFired=false,pend=null;
 const clearLp=()=>{if(lp){clearTimeout(lp.t);lp=null}};
 app.addEventListener('pointerdown',e=>{
@@ -4044,7 +4078,7 @@ setInterval(()=>{if(!modalOpen&&!dragging)render()},600000);
     t0 = null;
     if (modalOpen() || e.touches.length > 1) return;
     const t = e.target;
-    if (t.closest && t.closest(".hd,.ghd,.grip,.vtrack,input,textarea,select,.person")) return;
+    if (t.closest && t.closest(".hd,.ghd,.grip,.colgrip,.vtrack,input,textarea,select,.person")) return;
     t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY, t,
       down: !onVie && atEdge(1) && !innerScroll(t, 1), up: onVie && atEdge(-1) && !innerScroll(t, -1) };
   }, { passive: true });
