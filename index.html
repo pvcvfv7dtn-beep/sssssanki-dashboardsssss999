@@ -699,6 +699,10 @@
   #vie .td.early .tn, #vie .td.early .ck { opacity:.45; }
   #vie .td .jx2 { margin-left:6px; font-size:11px; font-weight:600; color:var(--mute); font-variant-numeric:tabular-nums; }
   .ptodo li.early .txt, .ptodo li.early .pcheck { opacity:.45; }
+  /* Temps depuis : les groupes (Chambre / Commun / Plantes…) côte à côte, en colonnes qui passent à la ligne sur petit écran */
+  #vie [data-glist="since"] { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:4px 22px; align-items:start; }
+  #vie [data-glist="since"] > .grp { margin-bottom:0; min-width:0; }
+  #vie [data-glist="since"] > .grp:has(> .gh.nog):has(> .list:empty) { display:none; }   /* groupe sans nom et vide : pas de colonne vide */
   #vie .list[data-list="since"]:empty { display:none; }   /* groupe vide : pas de « Aucun élément » ni d'espace */
   #vie .vghost { font-size:12px; min-height:28px; padding:4px 9px; border-radius:8px; }
   #vie .late { font-size:11px; padding:1px 8px; }
