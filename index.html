@@ -3597,6 +3597,18 @@ function reconcileAuto(){
    i.cdTodo=due;ch=true;
   }
  }));
+ /* comptes à rebours saisis à la main : même chose ; la tâche cochée archive le compte à rebours (décochée, il revient) */
+ S().cd.forEach(c=>{
+  if(!c.date)return;
+  const src='cd:'+c.id,due=c.date,tid='a-cd-'+c.id+'-'+due,tasks=all().filter(x=>x.src===src&&x.due===due);
+  if(tasks.some(x=>x.done)){if(!c.arch){c.arch=true;c.archBy='todo';ch=true}}
+  else if(tasks.length&&c.arch&&c.archBy==='todo'){c.arch=false;delete c.archBy;ch=true}
+  if(t>=due&&c.todo!==due&&!c.arch){
+   for(const L of [vt,it])for(let k=L.length-1;k>=0;k--)if(L[k].src===src&&L[k].due!==due&&!L[k].done)L.splice(k,1);
+   if(!all().some(x=>x.id===tid))vt.push({id:tid,name:c.name,done:false,src,due});
+   c.todo=due;ch=true;
+  }
+ });
  if(ch&&typeof renderPTodo==='function')renderPTodo();
  return ch;
 }
