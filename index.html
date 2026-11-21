@@ -294,6 +294,9 @@
   .ghostbtn:hover { opacity: .8; }
   .ghostbtn:active { transform: scale(.9); }
   body.ghost .ghostbtn { opacity: 1; filter: none; }
+  .ghostveil { position: fixed; inset: 0; z-index: 60; pointer-events: none;
+    background: radial-gradient(circle at 50% 40%, rgba(40,36,60,.82), rgba(8,8,14,.94)); }
+  .ghostfly { position: fixed; z-index: 61; pointer-events: none; font-size: 18px; line-height: 1; filter: drop-shadow(0 0 10px rgba(190,200,255,.7)); }
   /* Mode focus (fantôme) : Pomodoro, Anki et Journée un peu agrandis ; le reste estompé, flouté et assombri ;
      tout l'écran légèrement assombri pour reposer les yeux. Survol ~0,45 s : la carte redevient nette (délai d'intention habituel),
      apparition rapide, disparition plus lente pour éviter le clignotement. */
@@ -305,22 +308,22 @@
   body.ghost .a-items:not(.peek), body.ghost .a-lists:not(.peek), body.ghost .app > .paper:not(.peek) { filter: blur(3px) brightness(.55) saturate(.3); opacity: .45; }
   body.ghost .a-items.peek, body.ghost .a-lists.peek, body.ghost .app > .paper.peek { filter: brightness(.94); }
   @media (min-width: 901px) and (min-aspect-ratio: 4/3) {
-    body.ghost .app, body.ghost .app.imp-off { grid-template-rows: calc((100% - 28px) * 0.335) fit-content(calc((100% - 28px) * 0.38)) minmax(0, 1fr); }
+    body.ghost .app, body.ghost .app.imp-off { grid-template-rows: calc((100% - 28px) * 0.3125) fit-content(calc((100% - 28px) * 0.39)) minmax(0, 1fr); }
   }
-  @media (max-width: 900px), (max-aspect-ratio: 4/3) { body.ghost .app { grid-template-rows: 230px auto auto auto auto; } }
+  @media (max-width: 900px), (max-aspect-ratio: 4/3) { body.ghost .app { grid-template-rows: 220px auto auto auto auto; } }
   .app .ring, .ring .clock, .a-anki .label, .a-anki .value, .a-anki .value b, .a-anki .bar, .a-anki .legend, .day .time, .daypct .big, .daypct .small { transition: all .4s ease; }
-  body.ghost .app .ring { max-height: 236px; }
-  body.ghost .ring .clock { font-size: clamp(21px, 2.2vw, 34px); }
-  body.ghost .ring .mode { font-size: 11.5px; }
-  body.ghost .a-anki .label { font-size: 14.8px; }
-  body.ghost .a-anki .value { font-size: 13.5px; }
-  body.ghost .a-anki .value b { font-size: 16.5px; }
-  body.ghost .a-anki .bar { height: 13.5px; border-radius: 7px; }
-  body.ghost .a-anki .block + .block { margin-top: 21px; }
-  body.ghost .a-anki .legend { font-size: 12.5px; }
-  body.ghost .day .time { font-size: clamp(22px, 2.1vw, 32px); }
-  body.ghost .daypct .big { font-size: 14px; }
-  body.ghost .daypct .small { font-size: 11.5px; }
+  body.ghost .app .ring { max-height: 220px; }
+  body.ghost .ring .clock { font-size: clamp(20px, 2.05vw, 31.5px); }
+  body.ghost .ring .mode { font-size: 11.25px; }
+  body.ghost .a-anki .label { font-size: 14.4px; }
+  body.ghost .a-anki .value { font-size: 13.25px; }
+  body.ghost .a-anki .value b { font-size: 15.75px; }
+  body.ghost .a-anki .bar { height: 12.75px; border-radius: 7px; }
+  body.ghost .a-anki .block + .block { margin-top: 19.5px; }
+  body.ghost .a-anki .legend { font-size: 12.25px; }
+  body.ghost .day .time { font-size: clamp(21px, 2vw, 30px); }
+  body.ghost .daypct .big { font-size: 13.5px; }
+  body.ghost .daypct .small { font-size: 11.25px; }
   .worktot { position: absolute; top: 11px; right: 14px; z-index: 1; font: 200 13px/1 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; letter-spacing: .01em; color: var(--text); opacity: .75; font-variant-numeric: tabular-nums; }
   .ring .clock.over { color: #d9822b; }
   .tomato {
@@ -2122,7 +2125,7 @@ let theme = (() => { const t = localStorage.getItem(THEME_KEY); return THEMES[t]
 const sysDark = matchMedia("(prefers-color-scheme: dark)");
 sysDark.addEventListener("change", () => applyTheme());
 function applyTheme() {
-  const t = theme, dark = t === "dark" || (t === "auto" && sysDark.matches);
+  const t = theme, dark = document.body.classList.contains("ghost") || t === "dark" || (t === "auto" && sysDark.matches);   // mode fantôme : toujours sombre
   document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
   const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = dark ? "#161618" : "#f3f2ee";
   const b = byId("themeBtn"); b.textContent = THEMES[t][0];
@@ -2188,13 +2191,34 @@ document.addEventListener("pointerdown", e => { if (!byId("snd").contains(e.targ
 const GHOST_KEY = "ankiTrackerEDN.ghost";
 function applyGhost(on) {
   document.body.classList.toggle("ghost", on);
+  applyTheme();
   byId("ghostBtn").setAttribute("aria-pressed", String(on));
   document.querySelectorAll(".a-items, .a-lists, #paper").forEach(c => c.classList.remove("peek"));
+}
+/* passage en mode fantôme : une vague d'ombre part du fantôme et recouvre l'écran, le fantôme s'envole ;
+   en sortie, la vague se retire vers lui. Le thème bascule sous la vague, sans à-coup. */
+function ghostFx(on) {
+  const b = byId("ghostBtn").getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height / 2;
+  const R = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) + 40;
+  const veil = document.createElement("div"); veil.className = "ghostveil"; document.body.appendChild(veil);
+  const fly = document.createElement("div"); fly.className = "ghostfly"; fly.textContent = "👻";
+  Object.assign(fly.style, { left: x + "px", top: y + "px" }); document.body.appendChild(fly);
+  const circ = r => `circle(${r}px at ${x}px ${y}px)`;
+  const wave = veil.animate(on
+      ? [{ clipPath: circ(0), opacity: 1 }, { clipPath: circ(R), opacity: 1, offset: .55 }, { clipPath: circ(R), opacity: 0 }]
+      : [{ clipPath: circ(R), opacity: 0 }, { clipPath: circ(R), opacity: .9, offset: .3 }, { clipPath: circ(0), opacity: .9 }],
+    { duration: on ? 1100 : 800, easing: "cubic-bezier(.55,0,.25,1)", fill: "forwards" });
+  fly.animate(on
+      ? [{ transform: "translate(-50%,-50%) scale(1)", opacity: 1 }, { transform: "translate(-50%,-50%) translate(26px,-46px) rotate(-14deg) scale(2.4)", opacity: .9, offset: .45 }, { transform: "translate(-50%,-50%) translate(60px,-120px) rotate(10deg) scale(3.2)", opacity: 0 }]
+      : [{ transform: "translate(-50%,-50%) translate(60px,-120px) scale(3)", opacity: 0 }, { transform: "translate(-50%,-50%) scale(1)", opacity: 1 }],
+    { duration: on ? 1100 : 700, easing: "cubic-bezier(.3,.7,.3,1)", fill: "forwards" });
+  setTimeout(() => applyGhost(on), on ? 380 : 520);   // bascule cachée sous la vague
+  wave.onfinish = () => { veil.remove(); fly.remove(); };
 }
 byId("ghostBtn").addEventListener("click", () => {
   const on = !document.body.classList.contains("ghost");
   try { localStorage.setItem(GHOST_KEY, on ? "1" : ""); } catch {}
-  applyGhost(on);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !document.body.animate) applyGhost(on); else ghostFx(on);
 });
 applyGhost((() => { try { return localStorage.getItem(GHOST_KEY) === "1"; } catch { return false; } })());
 document.querySelectorAll(".a-items, .a-lists, #paper").forEach(card => {
