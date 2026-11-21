@@ -3540,9 +3540,10 @@ function normVie(v){
  v.titles=Object.assign({since:'Temps depuis',cd:'Compte à rebours',rec:'Recettes',links:'Liens utiles',todo:'To-do'},v.titles||{});
  ['todo','rec','links'].forEach(k=>{if(v[k].length!==1||v[k][0].name){const all=[];v[k].forEach(g=>all.push(...(g.items||[])));v[k]=[{id:(v[k][0]||{}).id||uid(),name:'',items:all}]}});
  if(!v.since.length)v.since.push({id:uid(),name:'',items:[]});
- v.since.forEach(g=>(g.items||[]).forEach(i=>{if(i.cdDays!==undefined)return;
+ v.since.forEach(g=>(g.items||[]).forEach(i=>{/* délai par défaut : jamais réglé, ou un nom de compte à rebours donné sans délai */
+  if(i.cdDays!==undefined&&!(i.cdName&&!i.cdDays))return;
   if(/^mph\s*pres/i.test(i.name||''))i.cdDays=28;
-  else if(/^machine\s*(de|à|a)?\s*linge/i.test(i.name||'')){i.cdDays=2;i.cdName='Étendre le linge'}}));
+  else if(/^machine\s*(de|à|a)?\s*linge/i.test(i.name||'')){i.cdDays=2;i.cdName=i.cdName||'Étendre le linge'}}));
  return v;
 }
 {const d=normVie(cp(VDEF));window.vieDefaults={};for(const k of Object.keys(d))window.vieDefaults[k]=canon(JSON.stringify(d[k]));}
@@ -3673,13 +3674,14 @@ M.addEventListener('click',e=>{
 M.addEventListener('submit',e=>{
  e.preventDefault();const fm=e.target,k=fm.dataset.k,id=fm.dataset.id,v=s=>{const el=$(s);return el?el.value.trim():''};
  const name=v('#f-name');if(!name)return;
+ if(k==='since'&&v('#f-cdname')&&!(parseInt(v('#f-cd'))>0)){const d=$('#f-cd');d.setCustomValidity('Indique le nombre de jours du compte à rebours');d.reportValidity();d.addEventListener('input',()=>d.setCustomValidity(''),{once:true});d.focus();return}
  if(k==='since'||k==='rec'||k==='links'||k==='todo'){
   const ng=S()[k].find(x=>x.id===v('#f-g'))||(g0=>g0)(findIt(S()[k],id)[0]||S()[k][0]);if(!ng)return;
   let it;const[g,i]=findIt(S()[k],id);
   if(g){it=g.items[i];if(g!==ng){g.items.splice(i,1);ng.items.push(it)}}
   else{it={id:uid()};ng.items.push(it)}
   it.name=name;
-  if(k==='since'){it.freq=parseInt(v('#f-freq'))||null;it.cdDays=parseInt(v('#f-cd'))||0;it.cdName=v('#f-cdname');const nl=v('#f-last')||null;if(nl!==it.last){it.last=nl;it.at=null}}
+  if(k==='since'){it.freq=parseInt(v('#f-freq'))||null;it.cdDays=parseInt(v('#f-cd'))||0;it.cdName=v('#f-cd')?v('#f-cdname'):'';const nl=v('#f-last')||null;if(nl!==it.last){it.last=nl;it.at=null}}
   else if(k==='todo'){}
   else if(k==='links'){let u=v('#f-url');if(u&&!/^[a-z]+:\/\//i.test(u))u='https://'+u;it.url=u}
   else{it.ing=$('#f-ing').value;it.steps=$('#f-steps').value;it.link=v('#f-link')}
