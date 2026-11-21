@@ -907,7 +907,7 @@
 
   <!-- ITEMS DU JOUR -->
   <section class="card a-items">
-    <h2>Items du jour <span class="count" id="c-items">0</span></h2>
+    <h2>Items <span class="count" id="c-items">0</span></h2>
     <form class="add" data-list="items" id="itemForm">
       <div class="ac">
         <div class="field">
@@ -1456,7 +1456,7 @@ function renderLists() {
   renderCourses();
   const past = Object.keys(state.items).filter(k => k !== today && state.items[k].length).sort().reverse().slice(0, 7);
   document.getElementById("history").innerHTML = past.map(k =>
-    `<div class="sub">${frDate(k)}</div><ul class="list">${listHTML(state.items[k], "items", k)}</ul>`).join("");
+    `<ul class="list">${listHTML(state.items[k], "items", k)}</ul>`).join("");   // jours précédents, sans en-tête de date
 }
 document.querySelectorAll("form.add").forEach(f => f.addEventListener("submit", e => {
   e.preventDefault();
